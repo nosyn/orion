@@ -313,9 +313,9 @@
 
 - `tauri.conf.json`
 - `src-tauri/src/**` (commands, ssh client, models, error types)
-- `src/components/layout/AppShell.tsx`
+- `src/components/layout/app-shell.tsx`
 - `src/pages/**` (each tab/page)
-- `src/lib/ipc.ts`, `src/lib/store.ts`, `src/lib/eventBus.ts`
+- `src/lib/ipc.ts`, `src/lib/store.ts`, `src/lib/event-bus.ts`
 
 ### 13.3 Tasks for Autonomy
 
@@ -372,8 +372,8 @@
   - src/state.rs
   - src/utils/{parse.rs, sudo.rs, docker.rs, wifi.rs, packages.rs, sys.rs}
 - src/
-  - lib/{ipc.ts, eventBus.ts, store.ts, types.ts}
-  - components/layout/AppShell.tsx
+  - lib/{ipc.ts, event-bus.ts, store.ts, types.ts}
+  - components/layout/app-shell.tsx
   - pages/{dashboard.tsx, terminal.tsx, files.tsx, editor.tsx, wifi.tsx, docker.tsx, system.tsx, libraries.tsx, settings.tsx}
   - features/{connection, dashboard, terminal, files, editor, wifi, docker, libraries, settings}/...
   - app.tsx, main.tsx, index.css
@@ -398,7 +398,11 @@
   - tegrastats://point with payload StatPoint
   - terminal://{id} with payload string chunk
 - State: lib/store.ts via zustand for connection status, profile, and rolling stats buffer (N=120).
-- eventBus.ts: subscribe/unsubscribe helpers with type guards.
+- event-bus.ts: subscribe/unsubscribe helpers with type guards.
+
+- Frontend naming conventions (important)
+  - Filenames: use lowercase with dash separators for all frontend files (examples: app-sidebar.tsx, use-mobile.ts, app-shell.tsx, event-bus.ts). Avoid CamelCase filenames in src/.
+  - Function names: use camelCase in frontend code (examples: openTerminal, startTegraStats). Do not use snake_case for frontend functions.
 
 ### 15.6 Connection + Security
 
