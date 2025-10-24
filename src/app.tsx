@@ -1,46 +1,50 @@
-import { useState } from 'react';
-import { AppSidebar } from './components/app-sidebar';
-import { invoke } from '@tauri-apps/api/core';
-import { SidebarInset, SidebarProvider } from './components/ui/sidebar';
-import { SiteHeader } from './components/site-header';
+import { SidebarProvider } from '@/components/ui/sidebar';
+import { AppShell } from '@/components/layout/app-shell';
+import { useHashRoute } from '@/lib/router';
+
+// Pages
+import { DashboardPage } from '@/pages/dashboard.page';
+import { TerminalPage } from '@/pages/terminal.page';
+import { FilesPage } from '@/pages/files.page';
+import { EditorPage } from '@/pages/editor.page';
+import { WifiPage } from '@/pages/wifi.page';
+import { DockerPage } from '@/pages/docker.page';
+import { SystemPage } from '@/pages/system.page';
+import { LibrariesPage } from '@/pages/libraries.page';
+import { SettingsPage } from '@/pages/settings.page';
 
 function App() {
-  const [greetMsg, setGreetMsg] = useState('');
-  const [name, setName] = useState('');
+  const { route } = useHashRoute();
 
-  async function greet() {
-    // Learn more about Tauri commands at https://tauri.app/develop/calling-rust/
-    setGreetMsg(await invoke('greet', { name }));
-  }
+  const renderRoute = () => {
+    switch (route) {
+      case '/dashboard':
+        return <DashboardPage />;
+      case '/terminal':
+        return <TerminalPage />;
+      case '/files':
+        return <FilesPage />;
+      case '/editor':
+        return <EditorPage />;
+      case '/wifi':
+        return <WifiPage />;
+      case '/docker':
+        return <DockerPage />;
+      case '/system':
+        return <SystemPage />;
+      case '/libraries':
+        return <LibrariesPage />;
+      case '/settings':
+        return <SettingsPage />;
+      default:
+        return <DashboardPage />;
+    }
+  };
 
   return (
-    <div className='[--header-height:calc(--spacing(14))]'>
-      <SidebarProvider className='flex flex-col'>
-        <SiteHeader />
-        <div className='flex flex-1'>
-          <AppSidebar />
-          <SidebarInset>
-            <div className='flex flex-1 flex-col gap-4 p-4'>
-              <form
-                className='row'
-                onSubmit={(e) => {
-                  e.preventDefault();
-                  greet();
-                }}
-              >
-                <input
-                  id='greet-input'
-                  onChange={(e) => setName(e.currentTarget.value)}
-                  placeholder='Enter a name...'
-                />
-                <button type='submit'>Greet</button>
-              </form>
-              <p>{greetMsg}</p>
-            </div>
-          </SidebarInset>
-        </div>
-      </SidebarProvider>
-    </div>
+    <SidebarProvider>
+      <AppShell currentRoute={route}>{renderRoute()}</AppShell>
+    </SidebarProvider>
   );
 }
 

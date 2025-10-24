@@ -374,7 +374,7 @@
 - src/
   - lib/{ipc.ts, eventBus.ts, store.ts, types.ts}
   - components/layout/AppShell.tsx
-  - pages/{Dashboard.tsx, Terminal.tsx, Files.tsx, Editor.tsx, Wifi.tsx, Docker.tsx, System.tsx, Libraries.tsx, Settings.tsx}
+  - pages/{dashboard.tsx, terminal.tsx, files.tsx, editor.tsx, wifi.tsx, docker.tsx, system.tsx, libraries.tsx, settings.tsx}
   - features/{connection, dashboard, terminal, files, editor, wifi, docker, libraries, settings}/...
   - app.tsx, main.tsx, index.css
 
