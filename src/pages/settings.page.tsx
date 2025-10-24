@@ -1,47 +1,99 @@
 import * as React from 'react';
-import { SshConfig, AuthType } from '@/lib/types';
+import { z } from 'zod';
+import { useForm } from 'react-hook-form';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { connect, save_credential, disconnect } from '@/lib/ipc';
+import { useAppStore } from '@/stores/app.store';
 import { cn } from '@/lib/utils';
-import { connect } from '@/lib/ipc';
+
+const schema = z.object({
+  host: z.string().min(1, 'Host is required'),
+  port: z.coerce
+    .number()
+    .int()
+    .positive('Port must be a positive integer')
+    .default(22),
+  username: z.string().min(1, 'Username is required'),
+  authType: z.enum(['password', 'key']),
+  password: z.string().optional(),
+  privateKeyPath: z.string().optional(),
+});
+
+type FormValues = z.infer<typeof schema>;
+
+type ConnectionStatus = 'connected' | 'disconnected' | 'connecting' | null;
 
 export function SettingsPage() {
-  const [form, setForm] = React.useState<SshConfig>({
-    host: '',
-    port: 22,
-    username: '',
-    authType: 'password',
-    password: '',
-    privateKeyPath: '',
+  const [connectionStatus, setConnectionStatus] =
+    React.useState<ConnectionStatus>(null);
+  // server-side message displayed via connectionStatus or optimistic store
+
+  const {
+    register,
+    handleSubmit,
+    watch,
+    formState: { errors },
+  } = useForm({
+    resolver: zodResolver(schema),
+    defaultValues: { port: 22, authType: 'password' },
   });
-  const [error, setError] = React.useState<string | null>(null);
-  const [status, setStatus] = React.useState<string>('');
 
-  const onChange = (k: keyof SshConfig, v: any) =>
-    setForm((s) => ({ ...s, [k]: v }));
+  const authType = watch('authType');
 
-  const validate = (): string | null => {
-    if (!form.host.trim()) return 'Host is required';
-    if (!form.username.trim()) return 'Username is required';
-    if (!Number.isInteger(form.port) || form.port <= 0)
-      return 'Port must be a positive integer';
-    if (form.authType === 'password' && !form.password?.trim())
-      return 'Password is required';
-    if (form.authType === 'key' && !form.privateKeyPath?.trim())
-      return 'Private key path is required';
-    return null;
+  const onSubmit = async (data: FormValues) => {
+    setConnectionStatus('connecting');
+    try {
+      // Cast to SshConfig shape
+      await connect({
+        host: data.host,
+        port: Number(data.port),
+        username: data.username,
+        authType: data.authType as any,
+        password: data.password,
+        privateKeyPath: data.privateKeyPath,
+      });
+
+      // show success briefly
+      // You may prefer to show a green toast here; for now we'll set serverMessage to success
+      setConnectionStatus('connected');
+    } catch (err) {
+      console.error(err);
+      setConnectionStatus('disconnected');
+    }
   };
 
-  const onSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    const v = validate();
-    setError(v);
-    setStatus('');
-    if (v) return;
+  const onSave = async (data: FormValues) => {
     try {
-      await connect(form);
-      setStatus('Connected ✔');
-    } catch (err: any) {
-      setStatus('');
-      setError(err?.message || String(err));
+      const id = await save_credential({
+        host: data.host,
+        port: Number(data.port),
+        username: data.username,
+        authType: data.authType as any,
+        password: data.password,
+        privateKeyPath: data.privateKeyPath,
+      });
+      if (id && id > 0) {
+        // refresh stored credentials
+        const store = useAppStore.getState();
+        // we will rely on app-level loader to refresh from backend; but set optimistic
+        store.setCredentials([
+          ...store.credentials,
+          {
+            id,
+            host: data.host,
+            port: Number(data.port),
+            username: data.username,
+            authType: data.authType as any,
+            password: data.password,
+            privateKeyPath: data.privateKeyPath,
+          },
+        ]);
+      }
+    } catch (e) {
+      // ignore for now
     }
   };
 
@@ -49,101 +101,127 @@ export function SettingsPage() {
     <div className='space-y-4'>
       <h1 className='text-xl font-semibold'>Settings</h1>
       <section className='space-y-2'>
-        <h2 className='text-base font-medium'>Connection Wizard</h2>
-        <form onSubmit={onSubmit} className='grid grid-cols-1 gap-3 max-w-xl'>
+        <h2 className='text-base font-medium'>
+          Connection Wizard: {connectionStatus}
+        </h2>
+        <form
+          onSubmit={handleSubmit(onSubmit)}
+          className='grid grid-cols-1 gap-3 max-w-xl'
+        >
           <div className='grid gap-1'>
-            <label className='text-sm' htmlFor='host'>
-              Host
-            </label>
-            <input
+            <Label htmlFor='host'>Host</Label>
+            <Input
               id='host'
-              className='h-9 rounded-md border px-2 bg-background'
-              value={form.host}
-              onChange={(e) => onChange('host', e.target.value)}
               placeholder='192.168.1.100'
+              {...register('host')}
             />
+            {errors.host ? (
+              <p className='text-sm text-red-600'>
+                {(errors.host as any)?.message}
+              </p>
+            ) : null}
           </div>
+
           <div className='grid gap-1'>
-            <label className='text-sm' htmlFor='port'>
-              Port
-            </label>
-            <input
-              id='port'
-              type='number'
-              className='h-9 rounded-md border px-2 bg-background'
-              value={form.port}
-              onChange={(e) =>
-                onChange('port', parseInt(e.target.value, 10) || 0)
-              }
-            />
+            <Label htmlFor='port'>Port</Label>
+            <Input id='port' type='number' {...register('port')} />
+            {errors.port ? (
+              <p className='text-sm text-red-600'>
+                {(errors.port as any)?.message}
+              </p>
+            ) : null}
           </div>
+
           <div className='grid gap-1'>
-            <label className='text-sm' htmlFor='username'>
-              Username
-            </label>
-            <input
+            <Label htmlFor='username'>Username</Label>
+            <Input
               id='username'
-              className='h-9 rounded-md border px-2 bg-background'
-              value={form.username}
-              onChange={(e) => onChange('username', e.target.value)}
+              {...register('username')}
               placeholder='ubuntu'
             />
+            {errors.username ? (
+              <p className='text-sm text-red-600'>
+                {(errors.username as any)?.message}
+              </p>
+            ) : null}
           </div>
+
           <div className='grid gap-1'>
-            <label className='text-sm'>Auth Type</label>
+            <Label>Auth Type</Label>
             <div className='flex gap-4'>
-              {(['password', 'key'] as AuthType[]).map((t) => (
-                <label key={t} className='flex items-center gap-2 text-sm'>
-                  <input
-                    type='radio'
-                    name='authType'
-                    checked={form.authType === t}
-                    onChange={() => onChange('authType', t)}
-                  />
-                  {t}
-                </label>
-              ))}
+              <Label className='flex items-center gap-2 text-sm'>
+                <input
+                  type='radio'
+                  value='password'
+                  {...register('authType')}
+                  defaultChecked
+                />
+                password
+              </Label>
+              <Label className='flex items-center gap-2 text-sm'>
+                <input type='radio' value='key' {...register('authType')} />
+                key
+              </Label>
             </div>
           </div>
-          {form.authType === 'password' ? (
+
+          {authType === 'password' ? (
             <div className='grid gap-1'>
-              <label className='text-sm' htmlFor='password'>
-                Password
-              </label>
-              <input
-                id='password'
-                type='password'
-                className='h-9 rounded-md border px-2 bg-background'
-                value={form.password || ''}
-                onChange={(e) => onChange('password', e.target.value)}
-              />
+              <Label htmlFor='password'>Password</Label>
+              <Input id='password' type='password' {...register('password')} />
+              {errors.password ? (
+                <p className='text-sm text-red-600'>
+                  {(errors.password as any)?.message}
+                </p>
+              ) : null}
             </div>
           ) : (
             <div className='grid gap-1'>
-              <label className='text-sm' htmlFor='key'>
-                Private Key Path
-              </label>
-              <input
-                id='key'
-                className='h-9 rounded-md border px-2 bg-background'
-                value={form.privateKeyPath || ''}
-                onChange={(e) => onChange('privateKeyPath', e.target.value)}
+              <Label htmlFor='privateKeyPath'>Private Key Path</Label>
+              <Input
+                id='privateKeyPath'
+                {...register('privateKeyPath')}
                 placeholder='~/.ssh/id_rsa'
               />
+              {errors.privateKeyPath ? (
+                <p className='text-sm text-red-600'>
+                  {(errors.privateKeyPath as any)?.message}
+                </p>
+              ) : null}
             </div>
           )}
-          {error ? <div className='text-sm text-red-600'>{error}</div> : null}
-          {status ? (
-            <div className='text-sm text-green-600'>{status}</div>
-          ) : null}
+
           <div className='flex gap-2'>
-            <button
-              className={cn(
-                'h-9 rounded-md px-3 border bg-primary text-primary-foreground'
-              )}
-            >
-              Connect
-            </button>
+            {connectionStatus === 'connected' ? (
+              <Button
+                variant='destructive'
+                type='button'
+                onClick={async () => {
+                  try {
+                    await disconnect();
+                  } finally {
+                    setConnectionStatus('disconnected');
+                  }
+                }}
+              >
+                Disconnect
+              </Button>
+            ) : (
+              <>
+                <Button
+                  className={cn('h-9 rounded-md px-3')}
+                  type='submit'
+                  disabled={connectionStatus === 'connecting'}
+                >
+                  {connectionStatus === 'connecting'
+                    ? 'Connecting...'
+                    : 'Connect'}
+                </Button>
+                <Button type='button' onClick={handleSubmit(onSave)}>
+                  Save
+                </Button>
+              </>
+            )}
           </div>
         </form>
       </section>

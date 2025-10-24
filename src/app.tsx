@@ -1,6 +1,8 @@
 import { SidebarProvider } from '@/components/ui/sidebar';
 import { AppShell } from '@/components/layout/app-shell';
 import { useHashRoute } from '@/lib/router';
+import { startSessionWatcher, list_credentials } from '@/lib/ipc';
+import { useAppStore } from '@/stores/app.store';
 
 // Pages
 import { DashboardPage } from '@/pages/dashboard.page';
@@ -47,5 +49,17 @@ function App() {
     </SidebarProvider>
   );
 }
+
+// start the session watcher once
+startSessionWatcher();
+// load saved credentials into the frontend store
+(async () => {
+  try {
+    const creds = await list_credentials();
+    useAppStore.getState().setCredentials(creds as any);
+  } catch (e) {
+    // ignore
+  }
+})();
 
 export default App;
