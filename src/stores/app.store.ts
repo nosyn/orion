@@ -1,24 +1,20 @@
-import { create } from 'zustand';
+import { Credential } from '@/types/db.type';
+import { createWithEqualityFn as create } from 'zustand/traditional';
 import { persist } from 'zustand/middleware';
-
-export type Credential = {
-  id?: number;
-  host: string;
-  port: number;
-  username: string;
-  authType: 'password' | 'key';
-  password?: string | null;
-  privateKeyPath?: string | null;
-};
 
 type AppState = {
   sessionToken: string | null;
-  setSessionToken: (t: string | null) => void;
   credentials: Credential[];
+};
+
+type AppActions = {
+  setSessionToken: (t: string | null) => void;
   setCredentials: (c: Credential[]) => void;
 };
 
-export const useAppStore = create<AppState>()(
+type AppStore = AppState & AppActions;
+
+export const useAppStore = create<AppStore>()(
   persist(
     (set) => ({
       sessionToken: null,

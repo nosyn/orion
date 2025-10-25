@@ -70,7 +70,7 @@ pub fn connect(config: serde_json::Value) -> Result<String, String> {
                 return Err(map_error(&e.to_string()));
             }
         }
-        _ => return Err("unsupported authType".into()),
+        _ => return Err("unsupported auth type".into()),
     }
 
     if !sess.authenticated() {

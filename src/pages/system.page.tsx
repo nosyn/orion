@@ -1,5 +1,3 @@
-import type { SysInfo } from '@/lib/types';
-
 export function SystemPage() {
   // Placeholder: system info will come from backend later
   const mock: Partial<SysInfo> = {

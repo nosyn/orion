@@ -27,9 +27,14 @@ type FormValues = z.infer<typeof schema>;
 type ConnectionStatus = 'connected' | 'disconnected' | 'connecting' | null;
 
 export function SettingsPage() {
+  const { sessionToken } = useAppStore(({ sessionToken }) => ({
+    sessionToken,
+  }));
+
   const [connectionStatus, setConnectionStatus] =
-    React.useState<ConnectionStatus>(null);
-  // server-side message displayed via connectionStatus or optimistic store
+    React.useState<ConnectionStatus>(
+      sessionToken ? 'connected' : 'disconnected'
+    );
 
   const {
     register,
@@ -51,9 +56,9 @@ export function SettingsPage() {
         host: data.host,
         port: Number(data.port),
         username: data.username,
-        authType: data.authType as any,
+        auth_type: data.authType as any,
         password: data.password,
-        privateKeyPath: data.privateKeyPath,
+        private_key_path: data.privateKeyPath,
       });
 
       // show success briefly
@@ -71,9 +76,9 @@ export function SettingsPage() {
         host: data.host,
         port: Number(data.port),
         username: data.username,
-        authType: data.authType as any,
+        auth_type: data.authType,
         password: data.password,
-        privateKeyPath: data.privateKeyPath,
+        private_key_path: data.privateKeyPath,
       });
       if (id && id > 0) {
         // refresh stored credentials
@@ -102,7 +107,7 @@ export function SettingsPage() {
       <h1 className='text-xl font-semibold'>Settings</h1>
       <section className='space-y-2'>
         <h2 className='text-base font-medium'>
-          Connection Wizard: {connectionStatus}
+          Connection Wizard: {connectionStatus} {sessionToken}
         </h2>
         <form
           onSubmit={handleSubmit(onSubmit)}

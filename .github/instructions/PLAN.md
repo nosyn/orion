@@ -403,6 +403,7 @@
 - Frontend naming conventions (important)
   - Filenames: use lowercase with dash separators for all frontend files (examples: app-sidebar.tsx, use-mobile.ts, app-shell.tsx, event-bus.ts). Avoid CamelCase filenames in src/.
   - Function names: use camelCase in frontend code (examples: openTerminal, startTegraStats). Do not use snake_case for frontend functions.
+  - Use snake case for shared types between frontend and backend
 
 ### 15.6 Connection + Security
 

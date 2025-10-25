@@ -13,7 +13,7 @@ pub fn run() {
     let _ = env_logger::Builder::from_env(env_logger::Env::default().default_filter_or("info"))
         .try_init();
 
-    info!("orion backend starting");
+    info!("ORION IS RUNNING 🚀🚀🚀");
 
     // Ensure DB exists
     db::init_db();
@@ -22,37 +22,44 @@ pub fn run() {
         .plugin(tauri_plugin_opener::init())
         .invoke_handler(tauri::generate_handler![
             commands::greet,
+            // Connection commands
             commands::connection::connect,
             commands::connection::disconnect,
             commands::connection::probe_ssh,
             commands::connection::is_session_alive,
+            // System commands
             commands::system::get_sys_info,
             commands::system::get_power_mode,
             commands::system::set_power_mode,
             commands::system::start_tegrastats_stream,
             commands::system::stop_tegrastats_stream,
+            commands::system::shutdown,
+            commands::system::reboot,
+            // File commands
             commands::files::list_dir,
             commands::files::read_file,
             commands::files::write_file,
             commands::files::rename,
             commands::files::remove,
             commands::files::mk_dir,
+            // Docker commands
             commands::docker::docker_list_images,
             commands::docker::docker_list_containers,
             commands::docker::docker_run,
             commands::docker::docker_stop,
             commands::docker::docker_remove,
+            // WiFi commands
             commands::wifi::wifi_scan,
             commands::wifi::wifi_connect,
             commands::wifi::wifi_status,
             commands::wifi::net_speedtest,
+            // Package commands
             commands::packages::packages_list,
             commands::packages::packages_install,
             commands::packages::packages_remove,
+            // Credential commands
             commands::credentials::save_credential,
             commands::credentials::list_credentials,
-            commands::system::shutdown,
-            commands::system::reboot
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

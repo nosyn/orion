@@ -1,22 +1,25 @@
 // Frontend IPC wrappers: prefer invoking Tauri commands when available,
 
-import { SshConfig, SysInfo, WifiNetwork } from './types';
 import { invoke } from '@tauri-apps/api/core';
 import { useAppStore } from '@/stores/app.store';
+import { IpcChannelEnum } from '@/common/enum/ipc-channel.enum';
 
 // --- Connection
 export async function connect(config: SshConfig): Promise<string> {
   // First probe the host/port to ensure reachability. If probe fails we
   // surface an error immediately so the Settings UI can show feedback.
   try {
-    await invoke('probe_ssh', { host: config.host, port: config.port });
+    await invoke(IpcChannelEnum.PROBE_SSH, {
+      host: config.host,
+      port: config.port,
+    });
   } catch (probeErr) {
     throw new Error(String(probeErr));
   }
 
   // invoke connect, expect a session token string
   try {
-    const token: string = await invoke('connect', { config });
+    const token: string = await invoke(IpcChannelEnum.CONNECT, { config });
     useAppStore.getState().setSessionToken(token);
 
     return token;
@@ -26,19 +29,11 @@ export async function connect(config: SshConfig): Promise<string> {
 }
 
 export async function save_credential(config: SshConfig): Promise<number> {
-  try {
-    return await invoke('save_credential', { config });
-  } catch (err) {
-    return -1;
-  }
+  return await invoke('save_credential', { config });
 }
 
-export async function list_credentials(): Promise<SshConfig[]> {
-  try {
-    return await invoke('list_credentials');
-  } catch (err) {
-    return [];
-  }
+export async function listCredentials(): Promise<SshConfig[]> {
+  return await invoke(IpcChannelEnum.LIST_CREDENTIALS);
 }
 
 export async function is_session_alive(token: string): Promise<boolean> {
@@ -86,11 +81,11 @@ export async function disconnect(): Promise<void> {
     // try to pull token from store
     const token = useAppStore.getState().sessionToken;
     if (token) {
-      await invoke('disconnect', { token });
+      await invoke(IpcChannelEnum.DISCONNECT, { token });
       useAppStore.getState().setSessionToken(null);
       return;
     }
-    return await invoke('disconnect');
+    return await invoke(IpcChannelEnum.DISCONNECT);
   } catch (err) {
     return Promise.resolve();
   }
@@ -99,7 +94,7 @@ export async function disconnect(): Promise<void> {
 // --- System
 export async function get_sys_info(): Promise<SysInfo> {
   try {
-    return await invoke('get_sys_info');
+    return await invoke(IpcChannelEnum.GET_SYS_INFO);
   } catch (err) {
     // Lightweight browser mock
     return {
@@ -118,7 +113,7 @@ export async function get_sys_info(): Promise<SysInfo> {
 
 export async function get_power_mode(): Promise<string> {
   try {
-    return await invoke('get_power_mode');
+    return await invoke(IpcChannelEnum.GET_POWER_MODE);
   } catch (err) {
     return 'unknown';
   }
@@ -126,7 +121,7 @@ export async function get_power_mode(): Promise<string> {
 
 export async function set_power_mode(mode: number): Promise<void> {
   try {
-    return await invoke('set_power_mode', { mode });
+    return await invoke(IpcChannelEnum.SET_POWER_MODE, { mode });
   } catch (err) {
     return Promise.resolve();
   }
@@ -134,7 +129,7 @@ export async function set_power_mode(mode: number): Promise<void> {
 
 export async function start_tegrastats_stream(): Promise<void> {
   try {
-    return await invoke('start_tegrastats_stream');
+    return await invoke(IpcChannelEnum.START_TEGRASTATS_STREAM);
   } catch (err) {
     return Promise.resolve();
   }
@@ -142,7 +137,7 @@ export async function start_tegrastats_stream(): Promise<void> {
 
 export async function stop_tegrastats_stream(): Promise<void> {
   try {
-    return await invoke('stop_tegrastats_stream');
+    return await invoke(IpcChannelEnum.STOP_TEGRASTATS_STREAM);
   } catch (err) {
     return Promise.resolve();
   }

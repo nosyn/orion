@@ -1,19 +1,17 @@
-import { SidebarProvider } from '@/components/ui/sidebar';
 import { AppShell } from '@/components/layout/app-shell';
+import { SidebarProvider } from '@/components/ui/sidebar';
 import { useHashRoute } from '@/lib/router';
-import { startSessionWatcher, list_credentials } from '@/lib/ipc';
-import { useAppStore } from '@/stores/app.store';
 
 // Pages
 import { DashboardPage } from '@/pages/dashboard.page';
-import { TerminalPage } from '@/pages/terminal.page';
-import { FilesPage } from '@/pages/files.page';
-import { EditorPage } from '@/pages/editor.page';
-import { WifiPage } from '@/pages/wifi.page';
 import { DockerPage } from '@/pages/docker.page';
-import { SystemPage } from '@/pages/system.page';
+import { EditorPage } from '@/pages/editor.page';
+import { FilesPage } from '@/pages/files.page';
 import { LibrariesPage } from '@/pages/libraries.page';
 import { SettingsPage } from '@/pages/settings.page';
+import { SystemPage } from '@/pages/system.page';
+import { TerminalPage } from '@/pages/terminal.page';
+import { WifiPage } from '@/pages/wifi.page';
 
 function App() {
   const { route } = useHashRoute();
@@ -49,17 +47,5 @@ function App() {
     </SidebarProvider>
   );
 }
-
-// start the session watcher once
-startSessionWatcher();
-// load saved credentials into the frontend store
-(async () => {
-  try {
-    const creds = await list_credentials();
-    useAppStore.getState().setCredentials(creds as any);
-  } catch (e) {
-    // ignore
-  }
-})();
 
 export default App;

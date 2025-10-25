@@ -1,7 +1,7 @@
 import * as React from 'react';
 import { SidebarInset } from '@/components/ui/sidebar';
-import { SiteHeader } from '@/components/site-header';
-import { AppSidebar } from '@/components/app-sidebar';
+import { SiteHeader } from '@/components/sidebar/site-header';
+import { AppSidebar } from '@/components/sidebar/app-sidebar';
 import { RoutePath } from '@/lib/router';
 
 type AppShellProps = {

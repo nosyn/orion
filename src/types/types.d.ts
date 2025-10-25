@@ -1,17 +1,17 @@
-// Shared types matching PLAN.md API surface
+// Shared types matching `src-tauri/src/types.rs`
 
-export type AuthType = 'key' | 'password';
+type AuthType = 'key' | 'password';
 
-export type SshConfig = {
+type SshConfig = {
   host: string;
   port: number;
   username: string;
-  authType: AuthType;
-  privateKeyPath?: string;
+  auth_type: AuthType;
+  private_key_path?: string;
   password?: string;
 };
 
-export type SysInfo = {
+type SysInfo = {
   hostname: string;
   os: string;
   kernel: string;
@@ -20,7 +20,7 @@ export type SysInfo = {
   uptimeSec: number;
 };
 
-export type StatPoint = {
+type StatPoint = {
   ts: number;
   cpu: number;
   ram_used_mb: number;
@@ -30,7 +30,7 @@ export type StatPoint = {
   power_mode?: string | number;
 };
 
-export type WifiNetwork = {
+type WifiNetwork = {
   ssid: string;
   signal: number;
   security: string;

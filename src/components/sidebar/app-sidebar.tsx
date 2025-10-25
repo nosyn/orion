@@ -1,22 +1,18 @@
-import * as React from 'react';
 import {
-  Command,
-  LifeBuoy,
-  Send,
-  SquareTerminal,
-  Settings2,
-  HardDrive,
-  FileCode2,
-  Wifi,
   Boxes,
+  Command,
+  FileCode2,
   Gauge,
+  HardDrive,
+  Settings2,
+  SquareTerminal,
+  Wifi,
   Wrench,
 } from 'lucide-react';
+import * as React from 'react';
 
-import { NavMain } from '@/components/nav-main';
-import { NavProjects } from '@/components/nav-projects';
-import { NavSecondary } from '@/components/nav-secondary';
-import { NavUser } from '@/components/nav-user';
+import { NavMain } from '@/components/sidebar/nav-main';
+import { NavUser } from '@/components/sidebar/nav-user';
 import {
   Sidebar,
   SidebarContent,
@@ -56,7 +52,7 @@ const data = {
       icon: FileCode2,
     },
     {
-      title: 'Wi‑Fi',
+      title: 'Wi-Fi',
       url: '#/wifi',
       icon: Wifi,
     },
@@ -81,19 +77,6 @@ const data = {
       icon: Settings2,
     },
   ],
-  navSecondary: [
-    {
-      title: 'Support',
-      url: '#',
-      icon: LifeBuoy,
-    },
-    {
-      title: 'Feedback',
-      url: '#',
-      icon: Send,
-    },
-  ],
-  projects: [],
 };
 
 function appSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
@@ -121,8 +104,6 @@ function appSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
       </SidebarHeader>
       <SidebarContent>
         <NavMain items={data.navMain} />
-        <NavProjects projects={data.projects} />
-        <NavSecondary items={data.navSecondary} className='mt-auto' />
       </SidebarContent>
       <SidebarFooter>
         <NavUser user={data.user} />
