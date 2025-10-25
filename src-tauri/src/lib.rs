@@ -67,7 +67,6 @@ pub fn run() {
             commands::packages::packages_remove,
             // Credential commands
             commands::credentials::save_credential,
-            commands::credentials::list_credentials,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

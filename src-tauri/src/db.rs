@@ -46,7 +46,7 @@ pub fn init_db() {
                 auth_type TEXT NOT NULL,
                 password TEXT,
                 private_key_path TEXT,
-                device_id INTEGER NOT NULL
+                device_id INTEGER UNIQUE NOT NULL
             )",
             [],
         );
@@ -68,14 +68,6 @@ pub fn init_db() {
         );
         let _ = conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_device_stats_device_ts ON device_stats(device_id, ts)",
-            [],
-        );
-
-        // Ensure a default device exists for quickstart
-        let _ = conn.execute(
-            "INSERT INTO device (name, description, created_at, updated_at)
-             SELECT 'default', 'Auto-created device', strftime('%s','now')*1000, strftime('%s','now')*1000
-             WHERE NOT EXISTS (SELECT 1 FROM device WHERE name='default')",
             [],
         );
     }

@@ -29,10 +29,7 @@ const data = {
 
 function appSidebar({ ...props }: React.ComponentProps<typeof Sidebar>) {
   return (
-    <Sidebar
-      className='top-(--header-height) h-[calc(100svh-var(--header-height))]!'
-      {...props}
-    >
+    <Sidebar variant='inset' {...props}>
       <SidebarHeader>
         <SidebarMenu>
           <SidebarMenuItem>

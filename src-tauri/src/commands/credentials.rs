@@ -33,32 +33,3 @@ pub fn save_credential(config: serde_json::Value, device_id: Option<i64>) -> Res
     let id = conn.last_insert_rowid();
     Ok(id)
 }
-
-#[tauri::command]
-pub fn list_credentials() -> Result<serde_json::Value, String> {
-    let conn = db_conn()?;
-    let mut stmt = conn
-        .prepare("SELECT id, host, port, username, auth_type, password, private_key_path, device_id FROM credential")
-        .map_err(|e| e.to_string())?;
-    let rows = stmt
-        .query_map([], |row| {
-            Ok(serde_json::json!({
-                "id": row.get::<_, i64>(0)?,
-                "host": row.get::<_, String>(1)?,
-                "port": row.get::<_, i64>(2)?,
-                "username": row.get::<_, String>(3)?,
-                "auth_type": row.get::<_, String>(4)?,
-                "password": row.get::<_, Option<String>>(5)?,
-                "private_key_path": row.get::<_, Option<String>>(6)?,
-                "device_id": row.get::<_, i64>(7)?,
-            }))
-        })
-        .map_err(|e| e.to_string())?;
-    let mut v = Vec::new();
-    for r in rows {
-        if let Ok(j) = r {
-            v.push(j);
-        }
-    }
-    Ok(serde_json::Value::Array(v))
-}
