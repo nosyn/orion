@@ -3,30 +3,11 @@ import * as React from 'react';
 // Minimal hash-based router to avoid adding deps.
 // Routes look like: #/dashboard, #/terminal, etc.
 
-export type RoutePath =
-  | '/dashboard'
-  | '/terminal'
-  | '/files'
-  | '/editor'
-  | '/wifi'
-  | '/docker'
-  | '/system'
-  | '/libraries'
-  | '/settings';
+export type RoutePath = '/dashboard' | '/devices';
 
 export function normalizeHash(hash: string): RoutePath {
   const cleaned = hash.replace(/^#/, '') || '/dashboard';
-  const known: RoutePath[] = [
-    '/dashboard',
-    '/terminal',
-    '/files',
-    '/editor',
-    '/wifi',
-    '/docker',
-    '/system',
-    '/libraries',
-    '/settings',
-  ];
+  const known: RoutePath[] = ['/dashboard', '/devices'];
   if (known.includes(cleaned as RoutePath)) return cleaned as RoutePath;
   return '/dashboard';
 }

@@ -176,8 +176,10 @@
 
 ### 5.1 Data Models (Conceptual)
 
-- `SshConfig`: `{ host, port, username, authType: "key" | "password", privateKeyPath?, password? }`
-- `SysInfo`: `{ hostname, os, kernel, cuda?, jetpack?, uptimeSec }`
+All types produced by the backend (events and command responses) use snake_case to avoid conversion on the Rust side. Frontend request payloads should also prefer snake_case for parity.
+
+- `SshConfig`: `{ host, port, username, auth_type: "key" | "password", private_key_path?, password? }`
+- `SysInfo`: `{ hostname, os, kernel, cuda?, jetpack?, uptime_sec }`
 - `StatPoint`: `{ ts, cpu, ram_used_mb, ram_total_mb, gpu_util?, temp_c?, power_mode? }`
 
 ---
@@ -397,13 +399,31 @@
 - Event names per plan:
   - tegrastats://point with payload StatPoint
   - terminal://{id} with payload string chunk
-- State: lib/store.ts via zustand for connection status, profile, and rolling stats buffer (N=120).
+- State: lib/store.ts via zustand for connection state and stats.
+  - Support multiple devices/sessions: `sessions: Record<string, SessionInfo>` where key is session token.
+  - Track `current_session` (token) used by pages to determine the active Jetson.
+  - Rolling stats buffer (N=120) can be derived from DB and/or live stream.
 - event-bus.ts: subscribe/unsubscribe helpers with type guards.
 
 - Frontend naming conventions (important)
+
   - Filenames: use lowercase with dash separators for all frontend files (examples: app-sidebar.tsx, use-mobile.ts, app-shell.tsx, event-bus.ts). Avoid CamelCase filenames in src/.
   - Function names: use camelCase in frontend code (examples: openTerminal, startTegraStats). Do not use snake_case for frontend functions.
-  - Use snake case for shared types between frontend and backend
+  - Use snake_case for shared types between frontend and backend.
+
+  ### 15.6 Persistence & Multi-Device
+
+  - SQLite schema updates:
+    - Table `device(id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, description TEXT)`
+    - Table rename `credentials` → `credential`.
+    - Add `device_id INTEGER NOT NULL` to `credential` (FK to `device`).
+    - New table `device_stats(id INTEGER PRIMARY KEY AUTOINCREMENT, ts INTEGER NOT NULL, cpu REAL NOT NULL, ram_used_mb INTEGER NOT NULL, ram_total_mb INTEGER NOT NULL, device_id INTEGER NOT NULL)`.
+  - Migrations: on startup, create missing tables; if `credentials` exists without `device_id`, create a default device and migrate rows to `credential` with that device.
+
+  ### 15.7 Stats Collection & Dashboard
+
+  - Start background stats collection after connect (per session) or trigger periodic sampling via IPC; persist into `device_stats` with timestamp and `device_id`.
+  - Dashboard reads recent stats from DB (e.g., last 120 points) and renders CPU and RAM charts over time.
 
 ### 15.6 Connection + Security
 
@@ -438,7 +458,7 @@
 - tauri-plugin-store = "0.3"
 - parking_lot = "0.12"
 - crossbeam-channel = "0.5"
-- sysinfo = "0.30"
+- sysinfo = "0.30" (optional; remote stats may be collected via SSH commands or tegrastats)
 
 ### 16.2 Frontend (pnpm)
 

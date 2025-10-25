@@ -43,4 +43,14 @@ export enum IpcChannelEnum {
   // Credential commands
   SAVE_CREDENTIAL = 'save_credential',
   LIST_CREDENTIALS = 'list_credentials',
+
+  // Device commands
+  ADD_DEVICE = 'add_device',
+  LIST_DEVICES = 'list_devices',
+
+  // Stats commands
+  RECORD_STAT = 'record_stat',
+  GET_STATS = 'get_stats',
+  START_STATS_STREAM = 'start_stats_stream',
+  STOP_STATS_STREAM = 'stop_stats_stream',
 }

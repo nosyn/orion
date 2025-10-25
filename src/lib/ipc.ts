@@ -5,7 +5,10 @@ import { useAppStore } from '@/stores/app.store';
 import { IpcChannelEnum } from '@/common/enum/ipc-channel.enum';
 
 // --- Connection
-export async function connect(config: SshConfig): Promise<string> {
+export async function connect(
+  config: SshConfig,
+  device_id?: number
+): Promise<string> {
   // First probe the host/port to ensure reachability. If probe fails we
   // surface an error immediately so the Settings UI can show feedback.
   try {
@@ -20,7 +23,7 @@ export async function connect(config: SshConfig): Promise<string> {
   // invoke connect, expect a session token string
   try {
     const token: string = await invoke(IpcChannelEnum.CONNECT, { config });
-    useAppStore.getState().setSessionToken(token);
+    useAppStore.getState().addSession({ token, device_id });
 
     return token;
   } catch (err) {
@@ -28,11 +31,17 @@ export async function connect(config: SshConfig): Promise<string> {
   }
 }
 
-export async function save_credential(config: SshConfig): Promise<number> {
-  return await invoke('save_credential', { config });
+export async function save_credential(
+  config: SshConfig,
+  device_id?: number
+): Promise<number> {
+  return await invoke(IpcChannelEnum.SAVE_CREDENTIAL, {
+    config,
+    device_id,
+  });
 }
 
-export async function listCredentials(): Promise<SshConfig[]> {
+export async function listCredentials(): Promise<any[]> {
   return await invoke(IpcChannelEnum.LIST_CREDENTIALS);
 }
 
@@ -49,11 +58,11 @@ export function startSessionWatcher(intervalMs = 3000) {
   try {
     if (_sessionWatcher) return;
     _sessionWatcher = window.setInterval(async () => {
-      const token = useAppStore.getState().sessionToken;
+      const { currentSession: token } = useAppStore.getState();
       if (!token) return;
       const alive = await is_session_alive(token);
       if (!alive) {
-        useAppStore.getState().setSessionToken(null);
+        if (token) useAppStore.getState().removeSession(token);
         // dispatch a DOM event so UI can listen if desired
         window.dispatchEvent(
           new CustomEvent('orion:session:closed', { detail: { token } })
@@ -79,10 +88,10 @@ export function stopSessionWatcher() {
 export async function disconnect(): Promise<void> {
   try {
     // try to pull token from store
-    const token = useAppStore.getState().sessionToken;
+    const { currentSession: token } = useAppStore.getState();
     if (token) {
       await invoke(IpcChannelEnum.DISCONNECT, { token });
-      useAppStore.getState().setSessionToken(null);
+      useAppStore.getState().removeSession(token);
       return;
     }
     return await invoke(IpcChannelEnum.DISCONNECT);
@@ -91,6 +100,69 @@ export async function disconnect(): Promise<void> {
   }
 }
 
+// Disconnect a specific session token (used by devices page)
+export async function disconnect_token(token: string): Promise<void> {
+  try {
+    await invoke(IpcChannelEnum.DISCONNECT, { token });
+    useAppStore.getState().removeSession(token);
+  } catch (err) {
+    return Promise.resolve();
+  }
+}
+
+// --- Devices
+export async function add_device(
+  name: string,
+  description?: string
+): Promise<number> {
+  return await invoke(IpcChannelEnum.ADD_DEVICE, { name, description });
+}
+
+export async function list_devices(): Promise<
+  Array<{ id: number; name: string; description?: string }>
+> {
+  return await invoke(IpcChannelEnum.LIST_DEVICES);
+}
+
+// --- Stats
+export async function record_stat(
+  token: string,
+  device_id?: number
+): Promise<StatPoint & { device_id: number }> {
+  return await invoke(IpcChannelEnum.RECORD_STAT, {
+    token,
+    device_id,
+  });
+}
+
+export async function get_stats(
+  device_id: number,
+  opts?: { limit?: number; start_ts?: number; end_ts?: number }
+): Promise<StatPoint[]> {
+  const { limit = 120, start_ts, end_ts } = opts || {};
+  return await invoke(IpcChannelEnum.GET_STATS, {
+    device_id,
+    limit,
+    start_ts,
+    end_ts,
+  });
+}
+
+export async function start_stats_stream(
+  token: string,
+  device_id?: number,
+  interval_ms = 1000
+): Promise<void> {
+  return await invoke(IpcChannelEnum.START_STATS_STREAM, {
+    token,
+    device_id,
+    interval_ms,
+  });
+}
+
+export async function stop_stats_stream(token: string): Promise<void> {
+  return await invoke(IpcChannelEnum.STOP_STATS_STREAM, { token });
+}
 // --- System
 export async function get_sys_info(): Promise<SysInfo> {
   try {

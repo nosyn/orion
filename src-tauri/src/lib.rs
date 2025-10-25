@@ -27,6 +27,14 @@ pub fn run() {
             commands::connection::disconnect,
             commands::connection::probe_ssh,
             commands::connection::is_session_alive,
+            // Device commands
+            commands::devices::add_device,
+            commands::devices::list_devices,
+            // Stats commands
+            commands::stats::record_stat,
+            commands::stats::get_stats,
+            commands::stats::start_stats_stream,
+            commands::stats::stop_stats_stream,
             // System commands
             commands::system::get_sys_info,
             commands::system::get_power_mode,
