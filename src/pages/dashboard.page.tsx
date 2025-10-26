@@ -40,8 +40,9 @@ const RANGES: Array<{
 ];
 
 export function DashboardPage() {
-  const { currentSession } = useAppStore((s) => ({
+  const { currentSession, sessions } = useAppStore((s) => ({
     currentSession: s.currentSession,
+    sessions: s.sessions,
   }));
   const [deviceId, setDeviceId] = React.useState<number | null>(null);
   const [points, setPoints] = React.useState<Point[]>([]);
@@ -134,7 +135,7 @@ export function DashboardPage() {
   return (
     <div className='space-y-4'>
       <div className='flex items-center justify-between gap-4'>
-        <h1 className='text-xl font-semibold'>Dashboard {currentSession}</h1>
+        <h1 className='text-xl font-semibold'>Dashboard</h1>
         <div className='flex items-center gap-2'>
           <div className='flex rounded border bg-background'>
             {RANGES.map((r) => (
@@ -169,7 +170,10 @@ export function DashboardPage() {
       {currentSession && (
         <Card>
           <CardHeader>
-            <CardTitle>System Utilization</CardTitle>
+            <CardTitle>
+              System Utilization - Device{' '}
+              {sessions.get(currentSession || '')?.deviceId}
+            </CardTitle>
           </CardHeader>
           <CardContent>
             <ChartContainer

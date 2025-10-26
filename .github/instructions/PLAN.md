@@ -143,6 +143,7 @@
 > **Note:** Names and payloads only. Keep types simple (strings, numbers, bools, arrays, objects). Do not include code.
 
 - `connect(SshConfig)` → `void | error`
+- `connect_device(device_id: number)` → `void | error` (backend loads credential from DB; no credential listing exposed to frontend)
 - `disconnect()` → `void`
 - `get_sys_info()` → `SysInfo`
 - `get_power_mode()` → `string`
@@ -173,6 +174,11 @@
 - `packages_remove(kind: "apt" | "pip", pkg: string)` → `string` (result text)
 - `shutdown()` → `void`
 - `reboot()` → `void`
+
+### 5.1.1 Device & Credential Management
+
+- `add_device(name: string, description?: string, credential?: SshConfig)` → `device_id` (stores device and an associated credential; `credential` optional but recommended)
+- Credentials are NOT listable via IPC. Frontend never fetches or displays stored secrets. To connect, UI sends only `device_id` to `connect_device`; backend retrieves the credential and establishes SSH.
 
 ### 5.1 Data Models (Conceptual)
 

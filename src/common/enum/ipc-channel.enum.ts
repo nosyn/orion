@@ -1,7 +1,7 @@
 export enum IpcChannelEnum {
   // Connection commands
-  CONNECT = 'connect',
-  DISCONNECT = 'disconnect',
+  CONNECT_DEVICE = 'connect_device',
+  DISCONNECT_DEVICE = 'disconnect_device',
   PROBE_SSH = 'probe_ssh',
   IS_SESSION_ALIVE = 'is_session_alive',
 
@@ -39,10 +39,6 @@ export enum IpcChannelEnum {
   PACKAGES_LIST = 'packages_list',
   PACKAGES_INSTALL = 'packages_install',
   PACKAGES_REMOVE = 'packages_remove',
-
-  // Credential commands
-  SAVE_CREDENTIAL = 'save_credential',
-  LIST_CREDENTIALS = 'list_credentials',
 
   // Device commands
   ADD_DEVICE = 'add_device',

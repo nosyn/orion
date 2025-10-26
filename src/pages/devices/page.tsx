@@ -1,16 +1,19 @@
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useGetDevices } from '@/hooks/ipc/use-get-devices';
-import { disconnect_token } from '@/lib/ipc';
+import { useConnectDevice } from '@/hooks/ipc/use-connect-device';
+import * as React from 'react';
 import { useAppStore } from '@/stores/app.store';
 import { AddDeviceButton } from './_components/add-device-button';
 
 export function DevicesPage() {
   const sessions = useAppStore((s) => s.sessions);
   const { data: devices, isLoading } = useGetDevices();
+  const { mutateAsync: connectMutate, isPending } = useConnectDevice();
+  const [connectingId, setConnectingId] = React.useState<number | null>(null);
 
   function deviceStatus(id: number): { connected: boolean; token?: string } {
-    const entry = Object.values(sessions).find((s) => s.device_id === id);
+    const entry = Object.values(sessions).find((s) => s.deviceId === id);
     return entry
       ? { connected: true, token: entry.token }
       : { connected: false };
@@ -56,16 +59,23 @@ export function DevicesPage() {
                 </div>
                 <div className='flex flex-wrap gap-2 pt-2'>
                   {status.connected ? (
+                    <Button variant='outline'>Disconnect</Button>
+                  ) : (
                     <Button
-                      variant='outline'
+                      disabled={isPending && connectingId === d.id}
                       onClick={async () => {
-                        if (status.token) await disconnect_token(status.token);
+                        try {
+                          setConnectingId(d.id);
+                          await connectMutate(d.id);
+                        } finally {
+                          setConnectingId(null);
+                        }
                       }}
                     >
-                      Disconnect
+                      {isPending && connectingId === d.id
+                        ? 'Connecting…'
+                        : 'Connect'}
                     </Button>
-                  ) : (
-                    <Button>Connect</Button>
                   )}
                 </div>
               </CardContent>

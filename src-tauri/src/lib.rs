@@ -23,8 +23,8 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             commands::greet,
             // Connection commands
-            commands::connection::connect,
-            commands::connection::disconnect,
+            commands::connection::connect_device,
+            commands::connection::disconnect_device,
             commands::connection::probe_ssh,
             commands::connection::is_session_alive,
             // Device commands

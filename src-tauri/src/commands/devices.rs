@@ -1,15 +1,43 @@
+use crate::commands::connection::validate_credential_cfg;
 use crate::db::db_conn;
+use crate::types::SshConfig;
 use rusqlite::params;
 
 #[tauri::command]
-pub fn add_device(name: &str, description: Option<String>) -> Result<i64, String> {
+pub fn add_device(
+    name: &str,
+    description: Option<String>,
+    credential: serde_json::Value,
+) -> Result<i64, String> {
+    let cfg: SshConfig = serde_json::from_value(credential).map_err(|e| e.to_string())?;
+    // Use shared connection helpers
+    validate_credential_cfg(&cfg)?;
+
+    // Save device information
     let conn = db_conn()?;
     conn.execute(
         "INSERT INTO device (name, description) VALUES (?1, ?2)",
         params![name, description.unwrap_or_default()],
     )
     .map_err(|e| e.to_string())?;
-    Ok(conn.last_insert_rowid())
+
+    // Save credential bound to this device
+    let device_id = conn.last_insert_rowid();
+    conn.execute(
+            "INSERT INTO credential (host, port, username, auth_type, password, private_key_path, device_id) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
+            params![
+                &cfg.host,
+                &cfg.port,
+                &cfg.username,
+                &cfg.auth_type,
+                &cfg.password,
+                &cfg.private_key_path,
+                &device_id
+            ],
+        )
+        .map_err(|e| e.to_string())?;
+
+    Ok(device_id)
 }
 
 #[tauri::command]

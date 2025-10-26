@@ -1,13 +1,3 @@
-export type Credential = {
-  id?: number;
-  host: string;
-  port: number;
-  username: string;
-  authType: 'password' | 'key';
-  password?: string | null;
-  privateKeyPath?: string | null;
-};
-
 export type Device = {
   id: number;
   name: string;
