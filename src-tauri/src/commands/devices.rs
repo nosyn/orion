@@ -1,5 +1,6 @@
 use crate::commands::connection::validate_credential_cfg;
 use crate::db::db_conn;
+use crate::session::SESSIONS;
 use crate::types::SshConfig;
 use rusqlite::params;
 
@@ -38,6 +39,25 @@ pub fn add_device(
         .map_err(|e| e.to_string())?;
 
     Ok(device_id)
+}
+
+#[tauri::command]
+pub fn remove_device(device_id: i64) -> Result<(), String> {
+    // Remove any active session
+    let mut map = SESSIONS.lock();
+    map.remove(device_id.to_string().as_str());
+
+    // Remove device and its associated credentials
+    let conn = db_conn()?;
+    conn.execute("DELETE FROM device WHERE id = ?1", params![device_id])
+        .map_err(|e| e.to_string())?;
+    conn.execute(
+        "DELETE FROM credential WHERE device_id = ?1",
+        params![device_id],
+    )
+    .map_err(|e| e.to_string())?;
+
+    Ok(())
 }
 
 #[tauri::command]

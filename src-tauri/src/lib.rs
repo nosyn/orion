@@ -27,8 +27,10 @@ pub fn run() {
             commands::connection::disconnect_device,
             commands::connection::probe_ssh,
             commands::connection::is_session_alive,
+            commands::connection::list_sessions,
             // Device commands
             commands::devices::add_device,
+            commands::devices::remove_device,
             commands::devices::list_devices,
             // Stats commands
             commands::stats::record_stat,

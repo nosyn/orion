@@ -1,14 +1,13 @@
 use crate::db::db_conn;
 use crate::session::{SessionHandle, SESSIONS};
 use crate::types::SshConfig;
-use log::{error, info, warn};
+use log::{info, warn};
 use parking_lot::Mutex;
 use ssh2::Session as SshSession;
 use std::net::{TcpStream, ToSocketAddrs};
 use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
-use uuid::Uuid;
 
 #[tauri::command]
 pub fn probe_ssh(host: &str, port: u16) -> Result<bool, String> {
@@ -26,6 +25,10 @@ pub fn probe_ssh(host: &str, port: u16) -> Result<bool, String> {
 #[tauri::command]
 pub fn connect_device(device_id: i64) -> Result<String, String> {
     info!("connect_device requested for device_id={}", device_id);
+
+    if SESSIONS.lock().contains_key(device_id.to_string().as_str()) {
+        return Ok(device_id.to_string());
+    }
 
     // Fetch credential for device
     let conn = db_conn()?;
@@ -53,26 +56,37 @@ pub fn connect_device(device_id: i64) -> Result<String, String> {
             password,
         };
         // Delegate to existing connect logic
-        return connect(val);
+        return connect(device_id.to_string(), val);
     }
 
     Err("no credential for device".into())
 }
 
 #[tauri::command]
-pub fn disconnect_device(token: &str) -> Result<(), String> {
+pub fn disconnect_device(device_id: i64) -> Result<String, String> {
+    info!("disconnect_device requested for device_id={}", device_id);
+
     let mut map = SESSIONS.lock();
-    if map.remove(token).is_some() {
-        info!("session {} removed", token);
-        Ok(())
+    if map.remove(device_id.to_string().as_str()).is_some() {
+        info!("session {} removed", device_id);
+        Ok(device_id.to_string())
     } else {
         Err("session not found".into())
     }
 }
 
 #[tauri::command]
-pub fn is_session_alive(token: &str) -> bool {
-    SESSIONS.lock().contains_key(token)
+pub fn is_session_alive(device_id: &str) -> bool {
+    SESSIONS.lock().contains_key(device_id)
+}
+
+#[tauri::command]
+pub fn list_sessions() -> Vec<String> {
+    SESSIONS
+        .lock()
+        .keys()
+        .map(|k| k.to_string())
+        .collect::<Vec<String>>()
 }
 
 pub fn validate_credential_cfg(cfg: &SshConfig) -> Result<(), String> {
@@ -81,7 +95,7 @@ pub fn validate_credential_cfg(cfg: &SshConfig) -> Result<(), String> {
     Ok(())
 }
 
-pub fn connect(cfg: SshConfig) -> Result<String, String> {
+fn connect(device_id: String, cfg: SshConfig) -> Result<String, String> {
     info!(
         "connect requested: host={} port={} user={} auth={}",
         cfg.host, cfg.port, cfg.username, cfg.auth_type
@@ -89,21 +103,20 @@ pub fn connect(cfg: SshConfig) -> Result<String, String> {
 
     let sess = create_authenticated_session(&cfg)?;
 
-    let token = Uuid::new_v4().to_string();
     let session = Arc::new(Mutex::new(sess));
     let handle = SessionHandle { session };
 
-    SESSIONS.lock().insert(token.clone(), handle);
+    SESSIONS.lock().insert(device_id.clone(), handle);
 
     // Background monitor thread
-    let token_clone = token.clone();
+    let monitor_id = device_id.clone();
     std::thread::spawn(move || loop {
         std::thread::sleep(Duration::from_secs(5));
         let mut should_remove = false;
 
         {
             let map = SESSIONS.lock();
-            if let Some(h) = map.get(&token_clone) {
+            if let Some(h) = map.get(&monitor_id) {
                 let guard = h.session.lock();
                 match guard.channel_session() {
                     Ok(mut ch) => {
@@ -121,12 +134,11 @@ pub fn connect(cfg: SshConfig) -> Result<String, String> {
         }
 
         if should_remove {
-            SESSIONS.lock().remove(&token_clone);
+            SESSIONS.lock().remove(&monitor_id);
             break;
         }
     });
-
-    Ok(token)
+    Ok(device_id)
 }
 
 /// Shared logic: TCP connect + SSH handshake + authentication

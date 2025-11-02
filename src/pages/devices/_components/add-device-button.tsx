@@ -19,11 +19,6 @@ import {
 } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
 import {
-  AddDeviceForm,
-  addDeviceSchema,
-  useAddDevice,
-} from '@/hooks/ipc/use-add-device';
-import {
   Select,
   SelectContent,
   SelectGroup,
@@ -32,8 +27,13 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import {
+  AddDeviceForm,
+  addDeviceSchema,
+  useAddDevice,
+} from '@/hooks/ipc/use-add-device';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { PlusCircleIcon } from 'lucide-react';
+import { IconPlus } from '@tabler/icons-react';
 import * as React from 'react';
 import { useForm, type Resolver } from 'react-hook-form';
 
@@ -78,8 +78,9 @@ export const AddDeviceButton = () => {
       }}
     >
       <AlertDialogTrigger asChild>
-        <Button variant='ghost' size='icon-sm' aria-label='Submit'>
-          <PlusCircleIcon />
+        <Button variant='outline' size='sm'>
+          <IconPlus />
+          <span className='hidden lg:inline'>Add Device</span>
         </Button>
       </AlertDialogTrigger>
       <AlertDialogContent>

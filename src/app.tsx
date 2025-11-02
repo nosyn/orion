@@ -9,6 +9,7 @@ import { DashboardPage } from '@/pages/dashboard.page';
 import { DevicesPage } from '@/pages/devices/page';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { queryClient } from './lib/query-client';
+import { useListSessions } from './hooks/ipc/use-list-sessions';
 
 function App() {
   const { route } = useHashRoute();

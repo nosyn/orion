@@ -5,14 +5,13 @@ import {
   ChartTooltipContent,
   type ChartConfig,
 } from '@/components/ui/chart';
+import { useListSessions } from '@/hooks/ipc/use-list-sessions';
 import {
   get_stats,
-  list_devices,
   record_stat,
   start_stats_stream,
   stop_stats_stream,
 } from '@/lib/ipc';
-import { useAppStore } from '@/stores/app.store';
 import { listen } from '@tauri-apps/api/event';
 import * as React from 'react';
 import { CartesianGrid, Legend, Line, LineChart, XAxis, YAxis } from 'recharts';
@@ -40,29 +39,11 @@ const RANGES: Array<{
 ];
 
 export function DashboardPage() {
-  const { currentSession, sessions } = useAppStore((s) => ({
-    currentSession: s.currentSession,
-    sessions: s.sessions,
-  }));
-  const [deviceId, setDeviceId] = React.useState<number | null>(null);
+  const { data: sessions } = useListSessions();
+
   const [points, setPoints] = React.useState<Point[]>([]);
   const [rangeKey, setRangeKey] = React.useState<string>('2m');
   const [liveBg, setLiveBg] = React.useState<boolean>(false);
-
-  // Resolve device
-  React.useEffect(() => {
-    let mounted = true;
-    (async () => {
-      const devices = await list_devices();
-      const did =
-        devices.find((d) => d.name === 'default')?.id ?? devices[0]?.id ?? null;
-      if (!mounted) return;
-      setDeviceId(did ?? null);
-    })();
-    return () => {
-      mounted = false;
-    };
-  }, [currentSession]);
 
   // Load initial window
   const reloadWindow = React.useCallback(async (did: number, rk: string) => {
@@ -78,21 +59,21 @@ export function DashboardPage() {
   }, []);
 
   React.useEffect(() => {
-    if (!deviceId) return;
-    reloadWindow(deviceId, rangeKey);
-  }, [deviceId, rangeKey, reloadWindow]);
+    if (!sessions.length) return;
+    reloadWindow(Number(sessions[0]), rangeKey);
+  }, [sessions, rangeKey, reloadWindow]);
 
   // Live: either background stream events or manual interval polling
   React.useEffect(() => {
-    if (!currentSession || !deviceId) return;
+    if (!sessions[0]) return;
     let unlisten: (() => void) | null = null;
     let interval: number | null = null;
     (async () => {
       if (liveBg) {
-        await start_stats_stream(currentSession, deviceId, 1000);
+        await start_stats_stream(sessions[0], Number(sessions[0]), 1000);
         const off = await listen('tegrastats://point', (e) => {
           const p = e.payload as any as Point;
-          if ((p as any).device_id !== deviceId) return;
+          if ((p as any).device_id !== sessions[0]) return;
           setPoints((prev) => [
             ...prev.slice(-RANGES.find((r) => r.key === rangeKey)!.limit + 1),
             p,
@@ -102,7 +83,7 @@ export function DashboardPage() {
       } else {
         interval = window.setInterval(async () => {
           try {
-            const p = await record_stat(currentSession, deviceId);
+            const p = await record_stat(sessions[0], Number(sessions[0]));
             setPoints((prev) => [
               ...prev.slice(-RANGES.find((r) => r.key === rangeKey)!.limit + 1),
               p as Point,
@@ -114,9 +95,9 @@ export function DashboardPage() {
     return () => {
       if (unlisten) unlisten();
       if (interval) window.clearInterval(interval);
-      if (liveBg && currentSession) stop_stats_stream(currentSession);
+      if (liveBg && sessions[0]) stop_stats_stream(sessions[0]);
     };
-  }, [currentSession, deviceId, liveBg, rangeKey]);
+  }, [sessions, liveBg, rangeKey]);
 
   // Prepare chart data
   const chartData = React.useMemo(
@@ -161,19 +142,16 @@ export function DashboardPage() {
         </div>
       </div>
 
-      {!currentSession && (
+      {!sessions.length && (
         <p className='text-sm text-muted-foreground'>
           Connect to a device to begin streaming stats.
         </p>
       )}
 
-      {currentSession && (
-        <Card>
+      {sessions.map((deviceId) => (
+        <Card key={deviceId}>
           <CardHeader>
-            <CardTitle>
-              System Utilization - Device{' '}
-              {sessions.get(currentSession || '')?.deviceId}
-            </CardTitle>
+            <CardTitle>System Utilization - Device {deviceId}</CardTitle>
           </CardHeader>
           <CardContent>
             <ChartContainer
@@ -222,7 +200,7 @@ export function DashboardPage() {
             </ChartContainer>
           </CardContent>
         </Card>
-      )}
+      ))}
     </div>
   );
 }

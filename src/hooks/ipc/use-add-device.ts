@@ -27,8 +27,10 @@ export const useAddDevice = () => {
     mutationFn: async (data: AddDeviceForm) => {
       return await invoke(IpcChannelEnum.ADD_DEVICE, data);
     },
-    onSuccess: () => {
-      toast.success('Device added successfully');
+    onSuccess: (deviceId) => {
+      toast.success('Device added successfully', {
+        id: `device-${deviceId}`,
+      });
       queryClient.invalidateQueries({
         queryKey: [IpcChannelEnum.LIST_DEVICES],
       });

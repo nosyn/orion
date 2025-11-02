@@ -13,6 +13,7 @@ export type Device = {
   macAddress?: string | null;
   ipAddress?: string | null;
   notes?: string | null;
+  lastConnectedAt?: number;
   createdAt: number;
   updatedAt: number;
 };

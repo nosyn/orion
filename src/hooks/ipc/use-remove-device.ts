@@ -3,13 +3,13 @@ import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { invoke } from '@tauri-apps/api/core';
 
-export const useConnectDevice = () => {
+export const useRemoveDevice = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationKey: [IpcChannelEnum.CONNECT_DEVICE],
+    mutationKey: [IpcChannelEnum.REMOVE_DEVICE],
     mutationFn: async (deviceId: number) => {
-      const result = await invoke<string>(IpcChannelEnum.CONNECT_DEVICE, {
+      const result = await invoke<string>(IpcChannelEnum.REMOVE_DEVICE, {
         deviceId,
       });
 
@@ -17,11 +17,14 @@ export const useConnectDevice = () => {
       queryClient.invalidateQueries({
         queryKey: [IpcChannelEnum.LIST_SESSIONS],
       });
+      queryClient.invalidateQueries({
+        queryKey: [IpcChannelEnum.LIST_DEVICES],
+      });
 
       return result;
     },
     onSuccess: (deviceId) =>
-      toast.success(`Connected device ${deviceId}`, {
+      toast.success(`Removed device ${deviceId}`, {
         id: `device-${deviceId}`,
       }),
     onError: (err) => {

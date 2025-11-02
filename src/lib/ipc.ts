@@ -1,7 +1,6 @@
 // Frontend IPC wrappers: prefer invoking Tauri commands when available,
 
 import { invoke } from '@tauri-apps/api/core';
-import { useAppStore } from '@/stores/app.store';
 import { IpcChannelEnum } from '@/common/enum/ipc-channel.enum';
 
 export async function is_session_alive(token: string): Promise<boolean> {
@@ -9,63 +8,6 @@ export async function is_session_alive(token: string): Promise<boolean> {
     return await invoke('is_session_alive', { token });
   } catch (err) {
     return false;
-  }
-}
-
-let _sessionWatcher: number | null = null;
-export function startSessionWatcher(intervalMs = 3000) {
-  try {
-    if (_sessionWatcher) return;
-    _sessionWatcher = window.setInterval(async () => {
-      const { currentSession: token } = useAppStore.getState();
-      if (!token) return;
-      const alive = await is_session_alive(token);
-      if (!alive) {
-        if (token) useAppStore.getState().removeSession(token);
-        // dispatch a DOM event so UI can listen if desired
-        window.dispatchEvent(
-          new CustomEvent('orion:session:closed', { detail: { token } })
-        );
-        if (_sessionWatcher) {
-          window.clearInterval(_sessionWatcher);
-          _sessionWatcher = null;
-        }
-      }
-    }, intervalMs);
-  } catch (e) {
-    // ignore if store not ready
-  }
-}
-
-export function stopSessionWatcher() {
-  if (_sessionWatcher) {
-    window.clearInterval(_sessionWatcher);
-    _sessionWatcher = null;
-  }
-}
-
-export async function disconnect(): Promise<void> {
-  try {
-    // try to pull token from store
-    const { currentSession: token } = useAppStore.getState();
-    if (token) {
-      await invoke(IpcChannelEnum.DISCONNECT_DEVICE, { token });
-      useAppStore.getState().removeSession(token);
-      return;
-    }
-    return await invoke(IpcChannelEnum.DISCONNECT_DEVICE);
-  } catch (err) {
-    return Promise.resolve();
-  }
-}
-
-// Disconnect a specific session token (used by devices page)
-export async function disconnect_token(token: string): Promise<void> {
-  try {
-    await invoke(IpcChannelEnum.DISCONNECT_DEVICE, { token });
-    useAppStore.getState().removeSession(token);
-  } catch (err) {
-    return Promise.resolve();
   }
 }
 
