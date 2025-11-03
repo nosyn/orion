@@ -18,16 +18,6 @@ export function DevicesPage() {
     <div>
       <DataTable
         data={devices.map((device) => {
-          console.log(
-            'device:',
-            device.id,
-            sessions.includes(String(device.id)),
-            isLoadingSessions
-              ? 'Loading'
-              : sessions.includes(String(device.id))
-              ? 'Connected'
-              : 'Disconnected'
-          );
           return {
             id: device.id,
             name: device.name,
@@ -37,7 +27,7 @@ export function DevicesPage() {
               : sessions.includes(String(device.id))
               ? 'Connected'
               : 'Disconnected',
-            serialNumber: device.serialNumber ?? '—',
+            notes: device.notes ?? '—',
             lastConnectedAt: device?.lastConnectedAt ?? 0,
           };
         })}

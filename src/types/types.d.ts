@@ -6,28 +6,32 @@ type SshConfig = {
   host: string;
   port: number;
   username: string;
-  auth_type: AuthType;
-  private_key_path?: string;
+  authType: AuthType;
+  privateKeyPath?: string;
   password?: string;
 };
 
-type SysInfo = {
+type SystemInfo = {
+  id?: number;
+  deviceId: number;
   hostname: string;
   os: string;
   kernel: string;
-  cuda?: string;
-  jetpack?: string;
+  cuda: string | null;
+  jetpack: string | null;
   uptimeSec: number;
+  updatedAt?: number;
 };
 
 type StatPoint = {
   ts: number;
   cpu: number;
-  ram_used_mb: number;
-  ram_total_mb: number;
-  gpu_util?: number;
-  temp_c?: number;
-  power_mode?: string | number;
+  ramUsedMb: number;
+  ramTotalMb: number;
+  gpuUtil?: number | null;
+  gpuTempC?: number | null;
+  powerMode?: string | null;
+  deviceId: number;
 };
 
 type WifiNetwork = {
@@ -35,4 +39,14 @@ type WifiNetwork = {
   signal: number;
   security: string;
   active: boolean;
+};
+
+type Device = {
+  id: number;
+  name: string;
+  description?: string | null;
+  notes?: string | null;
+  lastConnectedAt?: number;
+  createdAt: number;
+  updatedAt: number;
 };

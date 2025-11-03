@@ -55,8 +55,20 @@ pub fn connect_device(device_id: i64) -> Result<String, String> {
             private_key_path,
             password,
         };
-        // Delegate to existing connect logic
-        return connect(device_id.to_string(), val);
+
+        // Attempt connection
+        let result = connect(device_id.to_string(), val);
+
+        // Update last_connected_at timestamp on successful connection
+        if result.is_ok() {
+            let now = chrono::Utc::now().timestamp_millis();
+            let _ = conn.execute(
+                "UPDATE device SET last_connected_at = ?1 WHERE id = ?2",
+                rusqlite::params![now, device_id],
+            );
+        }
+
+        return result;
     }
 
     Err("no credential for device".into())
@@ -66,10 +78,15 @@ pub fn connect_device(device_id: i64) -> Result<String, String> {
 pub fn disconnect_device(device_id: i64) -> Result<String, String> {
     info!("disconnect_device requested for device_id={}", device_id);
 
+    let device_id_str = device_id.to_string();
+
+    // Stop any active stats streams for this device
+    let _ = crate::commands::stats::stop_stats_stream(&device_id_str);
+
     let mut map = SESSIONS.lock();
-    if map.remove(device_id.to_string().as_str()).is_some() {
+    if map.remove(device_id_str.as_str()).is_some() {
         info!("session {} removed", device_id);
-        Ok(device_id.to_string())
+        Ok(device_id_str)
     } else {
         Err("session not found".into())
     }

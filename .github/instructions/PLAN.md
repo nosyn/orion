@@ -67,8 +67,15 @@
 ### 3.2 Pages (first-level nav)
 
 1. **Dashboard** (default after connect)
-   - Cards: CPU, RAM, GPU, Temp, Uptime, Power Mode.
-   - Action row: Reboot, Shutdown, Power Mode select.
+   - **Multi-Device Support**: Separate card for each connected device session
+   - **Per-Device Controls**: Independent time range (2m/10m/1h) and streaming toggle
+   - **Current Stats Cards**: CPU, Memory, GPU, Temperature with real-time values
+   - **Detailed Charts**:
+     - CPU Utilization (area chart with gradient)
+     - Memory Usage (line chart showing MB used and percentage)
+     - GPU Utilization (area chart, shown when data available)
+     - GPU Temperature (line chart, shown when data available)
+   - **Live/Pause Toggle**: Each device can stream independently
 2. **Terminal**
    - PTY with xterm; copy/paste, clear, font size, color scheme.
 3. **Files**
@@ -81,11 +88,11 @@
 6. **Docker**
    - Images list; Containers list; run/stop/remove; run dialog with args.
 7. **System**
-   - OS, kernel, CUDA, JetPack, hostname, uptime.
+   - OS, kernel, CUDA, JetPack, hostname, uptime, power mode controls.
 8. **Libraries**
    - Wizard: apt & pip list/install/remove.
 9. **Settings**
-   - Connection profiles (host, port, username, auth type, key path), security notes, logs.
+   - Device management (add/remove devices), connection profiles, security notes, logs.
 
 ---
 
@@ -142,51 +149,85 @@
 
 > **Note:** Names and payloads only. Keep types simple (strings, numbers, bools, arrays, objects). Do not include code.
 
-- `connect(SshConfig)` → `void | error`
-- `connect_device(device_id: number)` → `void | error` (backend loads credential from DB; no credential listing exposed to frontend)
-- `disconnect()` → `void`
-- `get_sys_info()` → `SysInfo`
-- `get_power_mode()` → `string`
-- `set_power_mode(mode: number)` → `void`
-- `start_tegrastats_stream()` → `void` (emits `tegrastats://point` with `{ ts, cpu, ram_used_mb, ram_total_mb, gpu_util?, temp_c?, power_mode? }`)
-- `stop_tegrastats_stream()` → `void`
+### 5.1 Device & Credential Management
+
+- `add_device(name: string, description?: string)` → `device_id: number`
+- `list_devices()` → `Array<{ id: number, name: string, description?: string }>`
+- `remove_device(device_id: number)` → `void`
+- `save_credential(device_id: number, config: SshConfig)` → `void` (stores encrypted credential for device)
+
+### 5.2 Connection Management
+
+- `connect_device(device_id: number)` → `string` (returns session token; backend loads credential from DB)
+- `disconnect_device(device_id: string)` → `void` (device_id is session token)
+- `probe_ssh(host: string, port: number)` → `void | error` (test connectivity before saving)
+- `is_session_alive(device_id: string)` → `boolean`
+- `list_sessions()` → `string[]` (returns active session tokens)
+
+### 5.3 System Information & Power
+
+- `get_sys_info(device_id: string)` → `SystemInfo`
+- `get_power_mode(device_id: string)` → `string`
+- `set_power_mode(device_id: string, mode: number)` → `void`
+- `shutdown(device_id: string)` → `void`
+- `reboot(device_id: string)` → `void`
+
+### 5.4 Stats Collection & Streaming
+
+- `record_stat(token: string, device_id?: number)` → `StatPointWithDevice` (manual single stat recording)
+- `get_stats(device_id: number, options?: { limit?: number, start_ts?: number, end_ts?: number })` → `StatPoint[]`
+- `start_stats_stream(token: string, device_id?: number, interval_ms?: number)` → `void` (emits `tegrastats://point` events)
+- `stop_stats_stream(token: string)` → `void`
+
+**Event:** `tegrastats://point` → `{ ts, cpu, ram_used_mb, ram_total_mb, gpu_util?, gpu_temp_c?, power_mode?, device_id }`
+
+### 5.5 Terminal (PTY)
+
 - `terminal_open(id: string, cols: number, rows: number)` → `void` (emits `terminal://{id}` with chunk strings)
 - `terminal_write(id: string, data: string)` → `void`
 - `terminal_resize(id: string, cols: number, rows: number)` → `void`
 - `terminal_close(id: string)` → `void`
+
+**Event:** `terminal://{id}` → `string` (output chunks)
+
+### 5.6 File Operations (SFTP)
+
 - `list_dir(path: string)` → `[ { name, path, is_dir, size } ]`
 - `read_file(path: string)` → `string`
 - `write_file(path: string, content: string)` → `void`
 - `rename(from: string, to: string)` → `void`
 - `remove(path: string)` → `void`
 - `mk_dir(path: string)` → `void`
+
+### 5.7 Docker Management
+
 - `docker_list_images()` → `[ { id, repo, tag, size } ]`
 - `docker_list_containers()` → `[ { id, image, name, status } ]`
 - `docker_run(image: string, args?: string)` → `string` (container id or output)
 - `docker_stop(id: string)` → `string`
 - `docker_remove(id: string)` → `string`
+
+### 5.8 Wi-Fi & Network
+
 - `wifi_scan()` → `[ { ssid, signal, security, active } ]`
 - `wifi_connect(ssid: string, password?: string)` → `string` (result text)
 - `wifi_status()` → `{ connected, ssid?, ip? }`
 - `net_speedtest()` → `string` (result text)
+
+### 5.9 Package Management
+
 - `packages_list(kind: "apt" | "pip", query?: string)` → `string` (table text)
 - `packages_install(kind: "apt" | "pip", pkg: string)` → `string` (result text)
 - `packages_remove(kind: "apt" | "pip", pkg: string)` → `string` (result text)
-- `shutdown()` → `void`
-- `reboot()` → `void`
 
-### 5.1.1 Device & Credential Management
-
-- `add_device(name: string, description?: string, credential?: SshConfig)` → `device_id` (stores device and an associated credential; `credential` optional but recommended)
-- Credentials are NOT listable via IPC. Frontend never fetches or displays stored secrets. To connect, UI sends only `device_id` to `connect_device`; backend retrieves the credential and establishes SSH.
-
-### 5.1 Data Models (Conceptual)
+### 5.10 Data Models (Conceptual)
 
 All types produced by the backend (events and command responses) use snake_case to avoid conversion on the Rust side. Frontend request payloads should also prefer snake_case for parity.
 
 - `SshConfig`: `{ host, port, username, auth_type: "key" | "password", private_key_path?, password? }`
-- `SysInfo`: `{ hostname, os, kernel, cuda?, jetpack?, uptime_sec }`
-- `StatPoint`: `{ ts, cpu, ram_used_mb, ram_total_mb, gpu_util?, temp_c?, power_mode? }`
+- `SystemInfo`: `{ hostname, os, kernel, cuda?, jetpack?, uptime_sec }`
+- `StatPoint`: `{ ts, cpu, ram_used_mb, ram_total_mb, gpu_util?, gpu_temp_c?, power_mode? }`
+- `StatPointWithDevice`: `StatPoint & { device_id }`
 
 ---
 
@@ -399,50 +440,168 @@ All types produced by the backend (events and command responses) use snake_case 
 - packages\_\* → utils::packages
 - shutdown/reboot → utils::sys
 
-### 15.5 Frontend Contracts (no change to API Surface)
+### 15.5 Frontend Contracts & Architecture
 
-- Wrap each command in lib/ipc.ts via @tauri-apps/api/tauri invoke.
-- Event names per plan:
-  - tegrastats://point with payload StatPoint
-  - terminal://{id} with payload string chunk
-- State: lib/store.ts via zustand for connection state and stats.
-  - Support multiple devices/sessions: `sessions: Record<string, SessionInfo>` where key is session token.
-  - Track `current_session` (token) used by pages to determine the active Jetson.
-  - Rolling stats buffer (N=120) can be derived from DB and/or live stream.
-- event-bus.ts: subscribe/unsubscribe helpers with type guards.
+#### State Management (React Query + Zustand)
 
-- Frontend naming conventions (important)
+- **React Query** for server state (IPC commands):
 
-  - Filenames: use lowercase with dash separators for all frontend files (examples: app-sidebar.tsx, use-mobile.ts, app-shell.tsx, event-bus.ts). Avoid CamelCase filenames in src/.
-  - Function names: use camelCase in frontend code (examples: openTerminal, startTegraStats). Do not use snake_case for frontend functions.
-  - Use snake_case for shared types between frontend and backend.
+  - `useQuery` for data fetching (get_stats, list_devices, get_sys_info, etc.)
+  - `useMutation` for commands that modify state (connect_device, add_device, set_power_mode, etc.)
+  - Automatic caching, refetching, and background updates
+  - Query invalidation on mutations for data consistency
 
-  ### 15.6 Persistence & Multi-Device
+- **Zustand** for client state (lib/store.ts):
+  - App-level state (current theme, UI preferences)
+  - Minimal use; prefer React Query for server state
 
-  - SQLite schema updates:
-    - Table `device(id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, description TEXT)`
-    - Table rename `credentials` → `credential`.
-    - Add `device_id INTEGER NOT NULL` to `credential` (FK to `device`).
-    - New table `device_stats(id INTEGER PRIMARY KEY AUTOINCREMENT, ts INTEGER NOT NULL, cpu REAL NOT NULL, ram_used_mb INTEGER NOT NULL, ram_total_mb INTEGER NOT NULL, device_id INTEGER NOT NULL)`.
-  - Migrations: on startup, create missing tables; if `credentials` exists without `device_id`, create a default device and migrate rows to `credential` with that device.
+#### IPC Wrappers (lib/ipc.ts)
+
+- Thin wrappers over `@tauri-apps/api/core invoke`
+- Type-safe function signatures matching backend commands
+- Uses `IpcChannelEnum` for command names
+- Error handling at hook level, not in IPC layer
+
+#### Custom Hooks Pattern (hooks/ipc/)
+
+**Query Hooks** (for fetching data):
+
+```typescript
+// Example: use-get-stats.ts
+export const useGetStats = (deviceId: number, options?: GetStatsOptions) => {
+  return useQuery({
+    queryKey: [IpcChannelEnum.GET_STATS, deviceId, options],
+    queryFn: async () =>
+      invoke(IpcChannelEnum.GET_STATS, { device_id: deviceId, ...options }),
+    enabled: !!deviceId,
+  });
+};
+```
+
+**Mutation Hooks** (for commands):
+
+```typescript
+// Example: use-connect-device.ts
+export const useConnectDevice = () => {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (deviceId: number) =>
+      invoke(IpcChannelEnum.CONNECT_DEVICE, { deviceId }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: [IpcChannelEnum.LIST_SESSIONS],
+      });
+      toast.success('Connected');
+    },
+  });
+};
+```
+
+**Custom Streaming Hooks** (for events):
+
+```typescript
+// Example: use-stats-streaming.ts
+export const useStatsStreaming = ({ deviceId, enabled, onPoint }) => {
+  const [isStreaming, setIsStreaming] = useState(false);
+
+  useEffect(() => {
+    if (!enabled) return;
+
+    let unlisten: UnlistenFn | null = null;
+
+    (async () => {
+      await invoke(IpcChannelEnum.START_STATS_STREAM, { token: deviceId, ... });
+      unlisten = await listen('tegrastats://point', (event) => {
+        if (event.payload.device_id === deviceId) onPoint(event.payload);
+      });
+      setIsStreaming(true);
+    })();
+
+    return () => {
+      if (unlisten) unlisten();
+      invoke(IpcChannelEnum.STOP_STATS_STREAM, { token: deviceId });
+      setIsStreaming(false);
+    };
+  }, [deviceId, enabled]);
+
+  return { isStreaming };
+};
+```
+
+#### Event Handling
+
+- Event names follow pattern: `tegrastats://point`, `terminal://{id}`
+- Use `@tauri-apps/api/event listen()` for subscriptions
+- Proper cleanup in useEffect return functions
+- Device filtering in event handlers (check `device_id` field)
+
+#### Device Session Architecture
+
+- Session tokens are deviceId strings (returned from `connect_device`)
+- Multiple simultaneous device connections supported
+- `list_sessions()` returns array of active session tokens
+- Dashboard component iterates sessions and renders a card per device
+- Each DeviceCard manages its own stats streaming and state
+
+#### Naming Conventions
+
+- **Filenames**: lowercase with dash separators (e.g., `app-sidebar.tsx`, `use-mobile.ts`)
+- **Function names**: camelCase in frontend (e.g., `openTerminal`, `startStats`)
+- **Type names**: PascalCase (e.g., `StatPoint`, `SystemInfo`)
+- **IPC payloads**: snake_case to match Rust backend (e.g., `device_id`, `interval_ms`)
+
+#### Component Organization
+
+- `src/components/layout/` - Layout components (AppShell, etc.)
+- `src/components/ui/` - Reusable UI components from shadcn
+- `src/pages/` - Page components for each route
+- `src/hooks/ipc/` - Custom hooks for IPC commands and events
+- `src/lib/` - Utility functions, IPC wrappers, routing
+
+---
+
+### 15.6 Persistence & Multi-Device
+
+- SQLite schema (implemented in `src-tauri/src/db.rs`):
+  - Table `device(id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT NOT NULL, description TEXT)`
+  - Table `credential(id INTEGER PRIMARY KEY AUTOINCREMENT, device_id INTEGER NOT NULL, config TEXT NOT NULL)` - config is JSON-serialized SshConfig
+  - Table `device_stats(id INTEGER PRIMARY KEY AUTOINCREMENT, ts INTEGER NOT NULL, cpu REAL NOT NULL, ram_used_mb INTEGER NOT NULL, ram_total_mb INTEGER NOT NULL, gpu_util REAL, gpu_temp_c REAL, power_mode TEXT, device_id INTEGER NOT NULL)`
+- Stats Collection:
+  - Background thread per active session records stats at 1Hz via `record_stat`
+  - Persisted to `device_stats` table with `device_id` foreign key
+  - Dashboard queries recent window (e.g., last 120 points) via `get_stats(device_id, { limit, start_ts, end_ts })`
+  - Live streaming via `start_stats_stream` emits events; frontend appends to rolling buffer
+- Security:
+
+  - Credentials stored as encrypted JSON blobs in SQLite
+  - Never expose credential listing to frontend IPC
+  - Backend loads credential by device_id when connecting
 
   ### 15.7 Stats Collection & Dashboard
 
   - Start background stats collection after connect (per session) or trigger periodic sampling via IPC; persist into `device_stats` with timestamp and `device_id`.
   - Dashboard reads recent stats from DB (e.g., last 120 points) and renders CPU and RAM charts over time.
 
-### 15.6 Connection + Security
+### 15.7 Connection + Security
 
 - Secrets stored via tauri-plugin-store with encryption key in OS keystore (if available); never log passwords/keys.
 - Use sudo -n; detect exit code 1 with "a password is required" → show guidance banner for NOPASSWD rules.
 - SSH keys: support key path + optional passphrase; password auth fallback.
 
-### 15.7 Streaming & Performance
+### 15.8 Streaming & Performance
 
-- tegrastats cadence: 1 Hz; spawn blocking reader thread; parse tolerant regex; emit events.
-- Terminal: one thread per PTY; backpressure through bounded channel; trim carriage noise; handle resize.
+- Stats streaming:
+  - Backend spawns thread per session calling `record_stat` at configurable interval (default 1Hz)
+  - Emits `tegrastats://point` event with full StatPoint + device_id
+  - Frontend uses custom `useStatsStreaming` hook with proper cleanup
+  - Dashboard maintains rolling buffer (configurable 120-3600 points based on time range)
+- Terminal PTY:
+  - One thread per PTY session
+  - Backpressure through bounded channel
+  - Handle resize and cleanup properly
+  - Emit chunks via `terminal://{id}` event
 
-### 15.8 Tests
+### 15.9 Tests
 
 - Unit (Rust): command handlers with mocked transport traits.
 - Contract tests: ensure invoke shapes + event payloads match 5. API Surface.
@@ -464,7 +623,7 @@ All types produced by the backend (events and command responses) use snake_case 
 - tauri-plugin-store = "0.3"
 - parking_lot = "0.12"
 - crossbeam-channel = "0.5"
-- sysinfo = "0.30" (optional; remote stats may be collected via SSH commands or tegrastats)
+- SystemInfo = "0.30" (optional; remote stats may be collected via SSH commands or tegrastats)
 
 ### 16.2 Frontend (pnpm)
 
@@ -561,10 +720,62 @@ All types produced by the backend (events and command responses) use snake_case 
 
 ---
 
-## 22. Next Actions (Day 0–1)
+---
 
-1. Run bootstrap commands (15.2). Check app boots.
-2. Add repo layout scaffolding files and minimal routes.
-3. Implement src/lib/ipc.ts with no-op stubs returning Promise.reject("Not implemented") to unblock UI wiring.
-4. Implement connect/disconnect + get_sys_info in Rust; wire to System page.
-5. Set up basic logger (local file, rotating) with secrets scrubbed.
+## 22. Current Implementation Status (Updated 2025-11-02)
+
+### ✅ Completed Features
+
+- **Device Management**: Add, list, remove devices with encrypted credentials
+- **Connection Management**: Connect/disconnect devices, session tracking, SSH-based commands
+- **Dashboard**:
+  - Multi-device support with independent cards
+  - Real-time stats streaming (CPU, Memory, GPU, Temperature)
+  - Multiple graph types (Area charts, Line charts)
+  - Time range selection (2m, 10m, 1h)
+  - Live/Pause toggle per device
+- **Stats Pipeline**:
+  - Background stats collection and persistence to SQLite
+  - Query historical stats with time range filtering
+  - Custom React hook for streaming (`useStatsStreaming`)
+  - Event-driven updates with proper cleanup
+- **System Commands**: Get system info, power mode controls, shutdown/reboot via SSH
+- **Frontend Architecture**:
+  - React Query for server state management
+  - Custom hooks pattern for all IPC commands
+  - Type-safe IPC wrappers with enum-based command names
+  - Proper event handling and cleanup
+
+### 🚧 In Progress / Partial
+
+- **Terminal**: Backend implementation exists, frontend integration needed
+- **Files & Editor**: Backend SFTP commands exist, frontend UI needed
+- **Docker**: Backend commands exist, frontend UI needed
+- **Wi-Fi**: Backend commands exist, frontend UI needed
+- **Packages**: Backend commands exist, frontend UI needed
+
+### 📋 Not Started
+
+- Multi-tab terminal sessions
+- File upload/download with progress
+- Container build/pull UI
+- Jump host support
+
+### 🔧 Technical Debt / Known Issues
+
+- Stats streaming uses token parameter (session ID) - backend API uses this for session management
+- Some commands still need device_id parameter migration for consistency
+- Frontend error handling could be more granular
+- No retry logic for failed SSH commands
+
+---
+
+## 23. Next Actions (Immediate Priorities)
+
+1. **Terminal Page**: Integrate xterm.js with existing backend PTY commands
+2. **Files Page**: Build tree view using existing SFTP commands
+3. **System Page**: Wire up get_sys_info, power controls with device selection
+4. **Docker Page**: List images/containers UI with run/stop/remove actions
+5. **Settings Page**: Device CRUD interface with credential management
+
+---

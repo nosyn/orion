@@ -1,12 +1,15 @@
 use crate::db::db_conn;
 use crate::session::SESSIONS;
+use crate::types::StatPoint;
 use once_cell::sync::Lazy;
 use rusqlite::params;
 use std::collections::HashMap;
 use std::io::Read;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
+use std::thread;
 use std::time::Duration;
-use tauri::Emitter;
+use tauri::ipc::Channel;
 
 // Track previous CPU totals per session token to compute usage delta
 static LAST_CPU: Lazy<Mutex<HashMap<String, (u64, u64)>>> =
@@ -34,7 +37,7 @@ fn parse_cpu_line(line: &str) -> Option<(u64, u64)> {
 }
 
 #[tauri::command]
-pub fn record_stat(token: &str, device_id: Option<i64>) -> Result<serde_json::Value, String> {
+pub fn record_stat(token: &str, device_id: Option<i64>) -> Result<StatPoint, String> {
     // get session
     let handle = {
         let map = SESSIONS.lock();
@@ -123,15 +126,16 @@ pub fn record_stat(token: &str, device_id: Option<i64>) -> Result<serde_json::Va
     )
     .map_err(|e| e.to_string())?;
 
-    Ok(serde_json::json!({
-        "ts": ts,
-        "cpu": cpu,
-        "ram_used_mb": ram_used_mb,
-        "ram_total_mb": ram_total_mb,
-        "gpu_util": gpu_util,
-        "gpu_temp_c": gpu_temp_c,
-        "device_id": did
-    }))
+    Ok(StatPoint {
+        ts,
+        cpu,
+        ram_used_mb,
+        ram_total_mb,
+        gpu_util,
+        gpu_temp_c,
+        power_mode: None,
+        device_id: did,
+    })
 }
 
 #[tauri::command]
@@ -140,7 +144,7 @@ pub fn get_stats(
     limit: Option<i64>,
     start_ts: Option<i64>,
     end_ts: Option<i64>,
-) -> Result<serde_json::Value, String> {
+) -> Result<Vec<StatPoint>, String> {
     let conn = db_conn()?;
     let lim = limit.unwrap_or(120);
     let mut query = String::from("SELECT ts, cpu, ram_used_mb, ram_total_mb, gpu_util, gpu_temp_c, power_mode FROM device_stats WHERE device_id = ?1");
@@ -150,7 +154,7 @@ pub fn get_stats(
         bind.push(rusqlite::types::Value::from(s));
     }
     if let Some(e) = end_ts {
-        let idx = bind.len() + 1; // next index after current binds
+        let idx = bind.len() + 1;
         query.push_str(&format!(" AND ts <= ?{}", idx));
         bind.push(rusqlite::types::Value::from(e));
     }
@@ -158,25 +162,26 @@ pub fn get_stats(
     let mut stmt = conn.prepare(&query).map_err(|e| e.to_string())?;
     let rows = stmt
         .query_map(rusqlite::params_from_iter(bind.into_iter()), |row| {
-            Ok(serde_json::json!({
-                "ts": row.get::<_, i64>(0)?,
-                "cpu": row.get::<_, f64>(1)?,
-                "ram_used_mb": row.get::<_, i64>(2)?,
-                "ram_total_mb": row.get::<_, i64>(3)?,
-                "gpu_util": row.get::<_, Option<f64>>(4)?,
-                "gpu_temp_c": row.get::<_, Option<f64>>(5)?,
-                "power_mode": row.get::<_, Option<String>>(6)?,
-            }))
+            Ok(StatPoint {
+                ts: row.get(0)?,
+                cpu: row.get(1)?,
+                ram_used_mb: row.get(2)?,
+                ram_total_mb: row.get(3)?,
+                gpu_util: row.get(4)?,
+                gpu_temp_c: row.get(5)?,
+                power_mode: row.get(6)?,
+                device_id,
+            })
         })
         .map_err(|e| e.to_string())?;
-    let mut v: Vec<serde_json::Value> = Vec::new();
+    let mut v: Vec<StatPoint> = Vec::new();
     for r in rows {
-        if let Ok(j) = r {
-            v.push(j);
+        if let Ok(point) = r {
+            v.push(point);
         }
     }
     v.reverse(); // chronological
-    Ok(serde_json::Value::Array(v))
+    Ok(v)
 }
 
 fn parse_tegrastats_line(line: &str) -> (Option<f64>, Option<f64>) {
@@ -203,12 +208,75 @@ fn parse_tegrastats_line(line: &str) -> (Option<f64>, Option<f64>) {
     (gpu_util, gpu_temp)
 }
 
-// Background streaming management
-static STREAM_FLAGS: Lazy<Mutex<HashMap<String, Arc<std::sync::atomic::AtomicBool>>>> =
+// Background streaming management (old event-based approach - kept for compatibility)
+static STREAM_FLAGS: Lazy<Mutex<HashMap<String, Arc<AtomicBool>>>> =
     Lazy::new(|| Mutex::new(HashMap::new()));
-static STREAM_HANDLES: Lazy<Mutex<HashMap<String, std::thread::JoinHandle<()>>>> =
+static STREAM_HANDLES: Lazy<Mutex<HashMap<String, thread::JoinHandle<()>>>> =
     Lazy::new(|| Mutex::new(HashMap::new()));
 
+// Channel-based streaming management (new, efficient approach)
+static CHANNEL_STREAM_FLAGS: Lazy<Mutex<HashMap<String, Arc<AtomicBool>>>> =
+    Lazy::new(|| Mutex::new(HashMap::new()));
+static CHANNEL_STREAM_HANDLES: Lazy<Mutex<HashMap<String, thread::JoinHandle<()>>>> =
+    Lazy::new(|| Mutex::new(HashMap::new()));
+
+/// Stream stats using Tauri channels (efficient, designed for streaming)
+#[tauri::command]
+pub fn stream_stats(
+    token: String,
+    device_id: i64,
+    interval_ms: Option<u64>,
+    on_stat: Channel<StatPoint>,
+) -> Result<(), String> {
+    let interval = interval_ms.unwrap_or(1000);
+
+    // Stop any existing stream for this token
+    if let Some(flag) = CHANNEL_STREAM_FLAGS.lock().unwrap().remove(&token) {
+        flag.store(false, Ordering::Relaxed);
+    }
+    if let Some(handle) = CHANNEL_STREAM_HANDLES.lock().unwrap().remove(&token) {
+        let _ = handle.join();
+    }
+
+    let flag = Arc::new(AtomicBool::new(true));
+    let token_clone = token.clone();
+    CHANNEL_STREAM_FLAGS
+        .lock()
+        .unwrap()
+        .insert(token_clone, flag.clone());
+
+    let token_for_thread = token.clone();
+    let handle = thread::spawn(move || {
+        while flag.load(Ordering::Relaxed) {
+            // Record stat and send through channel
+            if let Ok(point) = record_stat(&token_for_thread, Some(device_id)) {
+                // If send fails, client disconnected - stop streaming
+                if on_stat.send(point).is_err() {
+                    break;
+                }
+            }
+            thread::sleep(Duration::from_millis(interval));
+        }
+    });
+
+    CHANNEL_STREAM_HANDLES.lock().unwrap().insert(token, handle);
+
+    Ok(())
+}
+
+/// Stop channel-based stats streaming
+#[tauri::command]
+pub fn stop_stream_stats(token: String) -> Result<(), String> {
+    if let Some(flag) = CHANNEL_STREAM_FLAGS.lock().unwrap().remove(&token) {
+        flag.store(false, Ordering::Relaxed);
+    }
+    if let Some(handle) = CHANNEL_STREAM_HANDLES.lock().unwrap().remove(&token) {
+        let _ = handle.join();
+    }
+    Ok(())
+}
+
+// Old event-based streaming (kept for backward compatibility, but channels are preferred)
 #[tauri::command]
 pub fn start_stats_stream(
     app: tauri::AppHandle,
@@ -216,21 +284,23 @@ pub fn start_stats_stream(
     device_id: Option<i64>,
     interval_ms: Option<u64>,
 ) -> Result<(), String> {
+    use tauri::Emitter;
+
     let t = token.to_string();
     let interval = interval_ms.unwrap_or(1000);
     // if already running, no-op
     if STREAM_HANDLES.lock().unwrap().contains_key(&t) {
         return Ok(());
     }
-    let flag = Arc::new(std::sync::atomic::AtomicBool::new(true));
+    let flag = Arc::new(AtomicBool::new(true));
     STREAM_FLAGS.lock().unwrap().insert(t.clone(), flag.clone());
     let app_handle = app.clone();
     let tok = t.clone();
     let did = device_id;
-    let handle = std::thread::spawn(move || {
+    let handle = thread::spawn(move || {
         loop {
             if let Some(f) = STREAM_FLAGS.lock().unwrap().get(&tok) {
-                if !f.load(std::sync::atomic::Ordering::Relaxed) {
+                if !f.load(Ordering::Relaxed) {
                     break;
                 }
             } else {
@@ -238,9 +308,10 @@ pub fn start_stats_stream(
             }
             // best-effort: record stat and emit
             if let Ok(point) = record_stat(&tok, did) {
+                // Silently ignore emit errors (happens when frontend reloads)
                 let _ = app_handle.emit("tegrastats://point", point);
             }
-            std::thread::sleep(Duration::from_millis(interval));
+            thread::sleep(Duration::from_millis(interval));
         }
     });
     STREAM_HANDLES.lock().unwrap().insert(t, handle);
@@ -251,9 +322,10 @@ pub fn start_stats_stream(
 pub fn stop_stats_stream(token: &str) -> Result<(), String> {
     let t = token.to_string();
     if let Some(flag) = STREAM_FLAGS.lock().unwrap().remove(&t) {
-        flag.store(false, std::sync::atomic::Ordering::Relaxed);
+        flag.store(false, Ordering::Relaxed);
     }
     if let Some(handle) = STREAM_HANDLES.lock().unwrap().remove(&t) {
+        // Don't wait for join on disconnect - thread will stop on its own
         let _ = handle.join();
     }
     Ok(())

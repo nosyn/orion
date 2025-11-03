@@ -9,7 +9,7 @@ import { DashboardPage } from '@/pages/dashboard.page';
 import { DevicesPage } from '@/pages/devices/page';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { queryClient } from './lib/query-client';
-import { useListSessions } from './hooks/ipc/use-list-sessions';
+import { NotFoundPage } from './pages/not-found.page';
 
 function App() {
   const { route } = useHashRoute();
@@ -21,7 +21,7 @@ function App() {
       case '/devices':
         return <DevicesPage />;
       default:
-        return <DashboardPage />;
+        return <NotFoundPage />;
     }
   };
 

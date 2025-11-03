@@ -17,6 +17,9 @@ export const useConnectDevice = () => {
       queryClient.invalidateQueries({
         queryKey: [IpcChannelEnum.LIST_SESSIONS],
       });
+      queryClient.invalidateQueries({
+        queryKey: [IpcChannelEnum.LIST_DEVICES],
+      });
 
       return result;
     },

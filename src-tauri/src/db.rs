@@ -13,23 +13,14 @@ pub fn db_conn() -> Result<Connection, String> {
 
 pub fn init_db() {
     if let Ok(conn) = db_conn() {
-        // device table with richer metadata
+        // device table - minimal core info only
         let _ = conn.execute(
             "CREATE TABLE IF NOT EXISTS device (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 name TEXT NOT NULL,
                 description TEXT,
-                serial_number TEXT,
-                cpu_model TEXT,
-                gpu_model TEXT,
-                total_ram_mb INTEGER,
-                total_storage_mb INTEGER,
-                os TEXT,
-                arch TEXT,
-                hostname TEXT,
-                mac_address TEXT,
-                ip_address TEXT,
                 notes TEXT,
+                last_connected_at INTEGER,
                 created_at INTEGER,
                 updated_at INTEGER
             )",
@@ -68,6 +59,27 @@ pub fn init_db() {
         );
         let _ = conn.execute(
             "CREATE INDEX IF NOT EXISTS idx_device_stats_device_ts ON device_stats(device_id, ts)",
+            [],
+        );
+
+        // system_info table - stores system information per device
+        // This is the source of truth for hardware/OS details
+        let _ = conn.execute(
+            "CREATE TABLE IF NOT EXISTS system_info (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                device_id INTEGER NOT NULL UNIQUE,
+                hostname TEXT NOT NULL,
+                os TEXT NOT NULL,
+                kernel TEXT NOT NULL,
+                cuda TEXT,
+                jetpack TEXT,
+                uptime_sec INTEGER NOT NULL,
+                updated_at INTEGER NOT NULL
+            )",
+            [],
+        );
+        let _ = conn.execute(
+            "CREATE INDEX IF NOT EXISTS idx_system_info_device ON system_info(device_id)",
             [],
         );
     }

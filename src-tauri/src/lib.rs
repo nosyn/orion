@@ -37,14 +37,15 @@ pub fn run() {
             commands::stats::get_stats,
             commands::stats::start_stats_stream,
             commands::stats::stop_stats_stream,
+            commands::stats::stream_stats,
+            commands::stats::stop_stream_stats,
             // System commands
-            commands::system::get_sys_info,
             commands::system::get_power_mode,
             commands::system::set_power_mode,
-            commands::system::start_tegrastats_stream,
-            commands::system::stop_tegrastats_stream,
             commands::system::shutdown,
             commands::system::reboot,
+            commands::system::fetch_and_store_sys_info,
+            commands::system::get_stored_sys_info,
             // File commands
             commands::files::list_dir,
             commands::files::read_file,
